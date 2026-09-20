@@ -31,6 +31,18 @@ EZ-Reader 是一个面向 Edge / Chrome 的 Manifest V3 浏览器扩展。它将
 
 ## 快速安装
 
+### 下载发布包（推荐）
+
+1. 打开 [Releases 下载页](https://github.com/Loki-0228/EZ-Reader/releases/latest)，在 Assets 中下载对应版本的 **EZ-Reader-v版本号.zip**。
+2. 解压到固定文件夹，确认里面直接包含 `manifest.json`。已构建的发布包无需安装 Node.js。
+3. 打开 Edge 的 `edge://extensions` 或 Chrome 的 `chrome://extensions`，开启「开发人员模式 / 开发者模式」。
+4. 点击「加载解压缩的扩展」，选择上一步包含 `manifest.json` 的文件夹。
+5. 打开普通网页，点击扩展图标，再点击「打开工具栏」。
+
+发布页同时提供 `SHA256SUMS.txt`，可用于校验 ZIP 下载是否完整。更新时将新版本解压到原安装目录，在扩展管理页重新加载扩展，并刷新网页。
+
+### 从源码构建
+
 准备 **Node.js 24** 和 Edge 或 Chrome。项目无需安装 npm 依赖。
 
 ```bash
@@ -39,10 +51,7 @@ cd EZ-Reader
 node tools/build.js
 ```
 
-1. 打开 Edge 的 `edge://extensions` 或 Chrome 的 `chrome://extensions`。
-2. 开启「开发人员模式 / 开发者模式」。
-3. 点击「加载解压缩的扩展」，选择项目中的 **`dist/extension`** 文件夹。
-4. 打开普通网页，点击扩展图标，再点击「打开工具栏」。
+构建完成后，按上面的加载步骤选择项目中的 **`dist/extension`** 文件夹。
 
 也可以下载仓库 ZIP，解压后在项目目录执行构建命令。`dist/` 由构建生成，不随源码提交。
 
