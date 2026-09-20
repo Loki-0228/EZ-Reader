@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Inside Someone Else&rsquo;s Frame &mdash; Embedded Notes</title>
+<meta name="ezr-fixture" content="lazy-iframe">
+<meta name="description" content="Robustness fixture: srcdoc iframe, fixed bottom bar, html/body overflow hidden with a scrollable inner wrapper, and a collapsed details section.">
+<style>
+  :root { color-scheme: light; }
+  html, body {
+    height: 100%;
+    overflow: hidden;             /* deliberately hidden: the reader must restore this on exit */
+  }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #f4f4f6;
+    color: #1b1c1f;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.5;
+  }
+  a { color: #1c4f9c; }
+  .scroller {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 84px;         /* clears the fixed bar */
+    box-sizing: border-box;
+  }
+  .masthead { background: #ffffff; border-bottom: 1px solid #dcdde1; }
+  .masthead-inner { max-width: 52rem; margin: 0 auto; padding: 13px 20px; }
+  .pub-name { font-size: 18px; font-weight: 700; }
+  .pub-tag { font-size: 12px; color: #666a72; }
+  nav.top-nav { background: #fbfbfc; border-bottom: 1px solid #e6e7ea; }
+  nav.top-nav ul { list-style: none; max-width: 52rem; margin: 0 auto; padding: 8px 20px; font-size: 13px; }
+  nav.top-nav li { display: inline-block; margin-right: 15px; }
+  nav.top-nav a { text-decoration: none; color: #33363c; }
+  main { max-width: 52rem; margin: 0 auto; padding: 20px 20px 40px; }
+  article#article {
+    background: #ffffff;
+    border: 1px solid #e2e3e7;
+    padding: 28px 32px 36px;
+    font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    line-height: 1.58;
+  }
+  article#article h1 { font-size: 27px; line-height: 1.26; margin: 0 0 10px; }
+  article#article h2 { font-size: 19px; margin: 28px 0 10px; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
+  article#article p { margin: 0 0 15px; }
+  .byline { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color: #62666e; margin-bottom: 20px; }
+  .embed-card { border: 1px solid #dcdde1; background: #fbfbfc; margin: 20px 0; }
+  .embed-cap { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color: #62666e; padding: 6px 10px; border-bottom: 1px solid #e6e7ea; }
+  .embed-card iframe { display: block; width: 100%; border: 0; }
+  details {
+    border: 1px solid #dcdde1;
+    background: #fbfbfc;
+    padding: 10px 14px;
+    margin: 20px 0;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 14px;
+  }
+  summary { cursor: pointer; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+  details .detail-body { color: #3a3d43; line-height: 1.5; }
+  .fixed-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #16202c;
+    color: #e8edf3;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 13px;
+    border-top: 1px solid #0d151d;
+    z-index: 50;
+  }
+  .fixed-bar-inner { max-width: 52rem; margin: 0 auto; padding: 12px 20px; }
+  .fixed-bar a { color: #b9d2f2; margin-right: 14px; }
+  footer.site-footer {
+    background: #ffffff;
+    border-top: 1px solid #dcdde1;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 13px;
+  }
+  .footer-inner { max-width: 52rem; margin: 0 auto; padding: 20px 20px 100px; }
+  .footer-col { display: inline-block; vertical-align: top; width: 31%; margin-right: 2%; }
+  .footer-col .col-head { font-weight: 700; margin-bottom: 6px; }
+  .footer-col a { display: block; padding: 2px 0; }
+  .share-row, .comment-row { margin-top: 14px; }
+  .share-row a, .comment-row a { display: inline-block; margin-right: 12px; }
+</style>
+</head>
+<body data-ezr-fixture="lazy-iframe">
+
+<div class="scroller">
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="pub-name">Embedded Notes</div>
+      <div class="pub-tag">Short reports on reading inside other people&rsquo;s pages</div>
+    </div>
+  </header>
+
+  <nav class="top-nav" aria-label="Site navigation">
+    <ul>
+      <li><a href="#article">Home</a></li>
+      <li><a href="#article">Reports</a></li>
+      <li><a href="#article">Embedded archive</a></li>
+      <li><a href="#article">Method</a></li>
+      <li><a href="#article">Contact</a></li>
+    </ul>
+  </nav>
+
+  <main>
+  <article id="article">
+
+    <h1>Reading Inside Someone Else&rsquo;s Frame</h1>
+    <div class="byline">By R. Okonkwo &middot; 2 May 2024 &middot; Embedded Notes no. 14</div>
+
+    <p>A great deal of the text that people read at work does not live on a page of its own. It sits inside a panel, a drawer, a modal, or a frame that some other application has opened, and the reader arrives at it without any of the context that a standalone article would provide. The typography in those embedded views is almost always worse than the typography of the host page, because the frame was sized for a dashboard widget and the content was written for something else entirely. The result is a reading experience that nobody designed and that every participant in our interviews recognised immediately once it was pointed out to them.</p>
+
+    <p>The technical constraints are genuine, and it is worth being fair to the people who build these views. A frame has a fixed height, and content that outgrows it must scroll inside the frame rather than pushing the surrounding interface around. Horizontal space is shared with navigation, so the measure is short or the text is squeezed. Vertical space is shared with toolbars, so leading is the first thing to be trimmed. None of these decisions is unreasonable in isolation, and together they produce a window in which four lines of text are visible at a time and the reader spends as much attention on scrolling as on the words.</p>
+
+    <div class="embed-card">
+      <div class="embed-cap">Embedded card (self-contained srcdoc frame, no network request)</div>
+      <iframe title="Embedded summary card: what the pilot found" loading="lazy" height="300" srcdoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;style&gt;body{font-family:Georgia,'Iowan Old Style',serif;margin:18px;color:#1b1c1f;line-height:1.55}h1{font-size:21px;line-height:1.25;margin:0 0 10px}p{font-size:14px;margin:0 0 11px}strong{font-weight:700}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;Embedded card: what the pilot found&lt;/h1&gt;&lt;p&gt;Thirty-four readers were given the same twenty-page report in two containers: a full-width page of its own, and a panel nine hundred pixels wide inside a project tool. The text was identical, the font was identical, and the panel version was abandoned more than twice as often.&lt;/p&gt;&lt;p&gt;The panel offered four visible lines at a time. Readers scrolled in short bursts, lost their place on roughly every third movement, and described the experience as reading through a letterbox.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;The fix was not more space.&lt;/strong&gt; Narrowing the measure to roughly sixty-five characters and raising the leading to one and a half lines made the panel version usable, even though it showed fewer words at once.&lt;/p&gt;&lt;p&gt;Frames are not going away, and neither is the pressure to fit more into them. What can change is the assumption that a constrained container justifies cramped text, which is a habit rather than a requirement.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;" width="100%"></iframe>
+    </div>
+
+    <p>Our pilot compared the same document in two containers. In the first, the report occupied a page of its own with a measure of about seventy characters and a line height of 1.6. In the second, the identical text was rendered inside a nine-hundred-pixel panel with a line height of 1.35 and a measure that varied with the window. Time to voluntary stop fell by more than half in the panel condition, and the difference was not explained by screen size, because both conditions were shown on the same display at the same brightness and the same zoom. The container, not the device, was doing the damage.</p>
+
+    <p>Scroll behaviour told the same story in a different currency. Readers in the panel condition scrolled more often, in shorter bursts, and reversed direction far more frequently, which is the signature of a reader who has lost their place and is searching for it. Reversals in the full-page condition clustered at section boundaries, where a reader might reasonably check a heading or a table. Reversals in the panel condition were distributed evenly through the text, which suggests that the reader was not checking anything in particular but simply re-finding the line they had just read.</p>
+
+    <p>There is a temptation to solve this by making the panel larger, and it usually fails for organisational rather than technical reasons. Panels are sized to fit the layout around them, and the layout has its own constraints, so the negotiation ends with a compromise that satisfies nobody. A more reliable approach is to accept the container and change what happens inside it: narrow the measure, raise the leading, and separate paragraphs clearly enough that the reader can see the structure of a document even when only a few lines are visible at any moment.</p>
+
+    <details>
+      <summary>Full method and the wording of the probe (collapsed by default)</summary>
+      <div class="detail-body">EZR_COLLAPSED_TEXT &mdash; Participants were recruited from three organisations and read four documents each, two in the full-page container and two in the panel container, with the order counterbalanced. The probe appeared after every six minutes of continuous reading and offered three options: continue, switch documents, or end the session. Time to voluntary stop was recorded as the interval between the first scroll and the moment the participant selected end, excluding any interval longer than ninety seconds in which no scrolling, keystroke, or pointer movement was recorded. Two participants were excluded because they reported prior familiarity with the documents. The remaining thirty-four produced the figures quoted above, and the raw timings are available on request under the usual access agreement.</div>
+    </details>
+
+    <p>Collapsed content deserves a specific warning. A disclosure widget that is closed contains text that the reader has not chosen to see, and extracting it into a reading view silently promotes material that the author deliberately hid behind a click. The same applies to tab panels that are not selected, accordion sections that are closed, and dialogs that were never opened. Whatever a reading tool does with such content, it should not present it as though it were part of the visible article, and it should not count it when estimating how long the article is.</p>
+
+    <p>Frames add a second complication, because the content of a document loaded into a frame belongs to a different document with its own styles and its own structure. Reading it correctly requires a decision about whether the frame is part of the article or an adjacent artefact: an embedded chart, a sign-up form, or a preview of a different page entirely. Our own rule is conservative. If the frame is small, if it duplicates content available elsewhere on the page, or if it contains interactive controls, it is treated as an artefact and left alone. Only a frame that carries substantial prose and sits inside the main content region is considered for extraction, and even then it is labelled as embedded.</p>
+
+    <p>The fixed bar at the bottom of this page is a third source of trouble, and it is here deliberately. Bars that stay on screen while the reader scrolls consume vertical space permanently, cover the last line of the text beneath them, and reappear after every attempt to dismiss them. A reading view has to sit above such a bar rather than beneath it, and it has to restore the page exactly as it found it on exit, including the scroll position, the overflow setting, and any styles the page applied to the document element. This page sets overflow hidden on the document element and scrolls an inner wrapper instead, which is a common pattern in application shells and breaks naive reading tools in a specific way: the tool locks scrolling on the body, finds that the page still scrolls, or restores the overflow value to the wrong element on exit. The correct behaviour is unglamorous, and it is the same in both cases. Record the value that was there, leave it alone while the reader is in the reading view, and put it back exactly as it was when the reader leaves, so that the page behaves afterwards precisely as it did before.</p>
+
+  </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-col">
+        <div class="col-head">Related articles</div>
+        <a href="#article">Panels, drawers, and the four-line window</a>
+        <a href="#article">When a disclosure widget hides the point</a>
+        <a href="#article">Restoring a page you never owned</a>
+      </div>
+      <div class="footer-col">
+        <div class="col-head">Share</div>
+        <a href="#article">Share on a social network</a>
+        <a href="#article">Share by e-mail</a>
+        <a href="#article">Copy a link</a>
+      </div>
+      <div class="footer-col">
+        <div class="col-head">Comments</div>
+        <a href="#article">18 comments</a>
+        <a href="#article">Add your comment</a>
+        <a href="#article">Commenting rules</a>
+      </div>
+      <div class="share-row">Share: <a href="#article">Twitter</a><a href="#article">Mastodon</a><a href="#article">LinkedIn</a></div>
+      <div class="comment-row">Comments close after fourteen days: <a href="#article">read the archive</a> &middot; <a href="#article">report a problem</a></div>
+    </div>
+  </footer>
+
+</div>
+
+<div class="fixed-bar">
+  <div class="fixed-bar-inner">
+    Stay on screen bar: <a href="#article">Subscribe to Embedded Notes</a><a href="#article">Share this report</a><a href="#article">Read the previous issue</a><a href="#article">Dismiss for now</a>
+  </div>
+</div>
+
+</body>
+</html>

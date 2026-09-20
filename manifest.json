@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "EZ-Reader",
+  "version": "0.1.0",
+  "description": "把网页任意区域转成分等级标题的类 Markdown 阅读视图：可换字体、可首字母大写、段间距大于 1.5 倍行距、自动缩放匹配。",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "EZ-Reader（Alt+Shift+E）",
+    "default_popup": "pages/popup.html"
+  },
+  "options_ui": {
+    "page": "pages/options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+E"
+      },
+      "description": "打开 EZ-Reader 面板"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": false
+    }
+  ]
+}

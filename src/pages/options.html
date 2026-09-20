@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>EZ-Reader 设置</title>
+    <!-- CSP: script-src 'self' / style-src 'self' — JS 与 CSS 必须是独立文件，不得内联。 -->
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="page__head">
+        <h1 class="page__title">EZ-Reader 设置</h1>
+        <p class="page__lead">
+          排版修改自动保存；翻译配置请点击“保存翻译设置”。页面下方可预览阅读排版。
+        </p>
+        <p id="saved" class="saved" role="status" aria-live="polite" hidden>已保存</p>
+        <p id="error" class="error" role="alert" hidden></p>
+      </header>
+
+      <section class="card translation-card" id="sec-translation" aria-labelledby="translation-heading">
+        <h2 id="translation-heading" class="card__title">划词翻译</h2>
+        <p class="note">选中文字后点击翻译，或开启预加载，让选区稳定后自动显示译文。</p>
+        <label class="translation-toggle"><input type="checkbox" id="translation-enabled" /> 开启划词翻译</label>
+        <label class="translation-field">当前翻译服务<select class="control" id="translation-provider"></select></label>
+        <div class="translation-preferences">
+          <label class="translation-toggle"><input type="checkbox" id="translation-preload" /> 划词后自动翻译（预加载）</label>
+          <p class="note">只调用所选服务，不会同时请求另一种翻译 API。默认关闭；开启后，选中文字会自动发送。</p>
+          <label class="translation-toggle"><input type="checkbox" id="translation-explanations" /> 生成词语讲解</label>
+          <label class="translation-toggle"><input type="checkbox" id="translation-word-cards" /> 生成生词卡（可导出 Anki）</label>
+          <label class="translation-toggle"><input type="checkbox" id="translation-auto-save" /> 将生成的卡片自动加入生词本</label>
+          <p class="note">讲解、卡片、保存分别控制。可以只看讲解，也可以只生成词语与译文卡片；生成卡片不会自动保存，除非勾选上面的自动加入。</p>
+          <label class="translation-field">英语水平（AI 生词难度）<select class="control" id="translation-level"></select></label>
+          <p class="note">AI 按水平挑选最多 6 个值得学习的词语。段落译文下可看本段生词；选用 DeepSeek 后，可点击“本篇生词”分析当前长文节选。</p>
+        </div>
+        <div class="translation-grid">
+          <label>原文语言<select class="control" id="translation-source"></select></label>
+          <label>目标语言<select class="control" id="translation-target"></select></label>
+        </div>
+        <p class="note">免费翻译使用 MyMemory，无需密钥，有服务额度限制。英文词语会附上词典释义和例句；其他语言可使用 AI 卡片。</p>
+        <label class="translation-field">DeepSeek 模型<select class="control" id="translation-model"></select></label>
+        <label class="translation-field">DeepSeek API Key<input class="control" id="translation-key" type="password" autocomplete="off" spellcheck="false" maxlength="256" /></label>
+        <p id="translation-key-state" class="note"></p>
+        <p class="note">密钥保存在本机，由后台调用官方 API；DeepSeek 按你的账户额度计费。免费模式发送选文到翻译和词典服务，并转译词典释义。首次 AI 翻译还会用当前阅读节选分析语境，后续只使用摘要、相邻段落和选文；词语讲解单独生成。切换页面或阅读区域时重建语境。</p>
+        <div class="translation-actions">
+          <button id="translation-save" class="button" type="button">保存翻译设置</button>
+          <button id="translation-remove-key" class="button" type="button">删除密钥</button>
+          <button id="translation-clear" class="button" type="button">清除翻译语境</button>
+        </div>
+        <p id="translation-status" class="note" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="wordbook-heading" id="sec-wordbook">
+        <h2 id="wordbook-heading" class="card__title">生词本 <span id="wordbook-count" class="wordbook-count">0 张</span></h2>
+        <p class="note">留住读过的词语，带着原句去复习。</p>
+        <div class="translation-actions">
+          <button class="button" id="wordbook-export" type="button" disabled>导出全部 Anki</button>
+          <button class="button" id="wordbook-tsv" type="button" disabled>通用 TSV</button>
+        </div>
+        <input id="wordbook-search" class="control wordbook-search" type="search" placeholder="查找词语或释义" aria-label="查找生词" />
+        <div id="wordbook-list" class="wordbook-list"></div>
+        <p id="wordbook-status" class="note" role="status" aria-live="polite"></p>
+        <details class="note wordbook-help"><summary>怎样导入 Anki？</summary>
+          <p>下载后在 Anki 中选择“文件 → 导入”，选中导出的 txt 文件。笔记类型选择双面（Basic），两列分别映射到正面和背面。文件已包含制表符、HTML 与 EZReader 标签设置。</p>
+          <p>通用 TSV 可用于其他记忆软件，或复制到 Quizlet 的导入框：词语和释义以制表符分隔，每行一张卡片。扩展不会自动上传卡片。</p>
+        </details>
+      </section>
+
+      <section class="card" aria-labelledby="sec-type">
+        <h2 id="sec-type" class="card__title">排版</h2>
+
+        <div class="row">
+          <label class="row__label" for="set-font">字体</label>
+          <div class="row__control">
+            <select id="set-font" class="control" data-key="fontId"></select>
+          </div>
+          <output class="row__value" id="out-font" for="set-font"></output>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-size">正文字号</label>
+          <div class="row__control">
+            <input
+              id="set-size"
+              class="control range"
+              type="range"
+              min="14"
+              max="24"
+              step="1"
+              value="16"
+              data-key="bodyFontSize"
+            />
+          </div>
+          <output class="row__value" id="out-size" for="set-size">16px</output>
+        </div>
+
+        <div class="row">
+          <span class="row__label">标题字号倍率</span>
+          <div class="row__control">
+            <output id="out-headings" class="headings-readout" for="set-size">
+              H1 30px · H2 25px · H3 21px · H4 18px · H5 17px · H6 16px
+            </output>
+          </div>
+          <span class="row__value row__value--muted">只读</span>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-line-height">行高</label>
+          <div class="row__control">
+            <input
+              id="set-line-height"
+              class="control range"
+              type="range"
+              min="1.2"
+              max="2.2"
+              step="0.05"
+              value="1.6"
+              data-key="lineHeight"
+            />
+          </div>
+          <output class="row__value" id="out-line-height" for="set-line-height">1.60</output>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-gap">段间距系数</label>
+          <div class="row__control">
+            <input
+              id="set-gap"
+              class="control range"
+              type="range"
+              min="1.15"
+              max="3"
+              step="0.05"
+              value="1.6"
+              data-key="gapFactor"
+            />
+          </div>
+          <output class="row__value" id="out-gap" for="set-gap">1.60（26.6px）</output>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-measure">列宽</label>
+          <div class="row__control">
+            <input
+              id="set-measure"
+              class="control range"
+              type="range"
+              min="24"
+              max="90"
+              step="1"
+              value="44"
+              data-key="measure"
+            />
+          </div>
+          <output class="row__value" id="out-measure" for="set-measure">44rem</output>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-zoom-mode">缩放模式</label>
+          <div class="row__control">
+            <select id="set-zoom-mode" class="control" data-key="zoomMode">
+              <option value="fit-width">适配宽度</option>
+              <option value="fit-page">适配页</option>
+              <option value="manual">手动</option>
+            </select>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <div class="row" id="zoom-row" hidden>
+          <label class="row__label" for="set-zoom">缩放倍率</label>
+          <div class="row__control">
+            <input
+              id="set-zoom"
+              class="control range"
+              type="range"
+              min="0.6"
+              max="2.5"
+              step="0.05"
+              value="1"
+              data-key="zoom"
+            />
+          </div>
+          <output class="row__value" id="out-zoom" for="set-zoom">100%</output>
+        </div>
+
+        <div class="row">
+          <label class="row__label" for="set-theme">配色主题</label>
+          <div class="row__control">
+            <select id="set-theme" class="control" data-key="theme">
+              <option value="light">浅色</option>
+              <option value="sepia">米色</option>
+              <option value="dark">深色</option>
+              <option value="auto">跟随系统</option>
+            </select>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="sec-content">
+        <h2 id="sec-content" class="card__title">内容识别</h2>
+
+        <div class="row">
+          <label class="row__label" for="set-heading-mode">标题识别强度</label>
+          <div class="row__control">
+            <select id="set-heading-mode" class="control" data-key="headingMode">
+              <option value="conservative">保守（只认原生标题标签）</option>
+              <option value="standard">标准（推荐）</option>
+              <option value="aggressive">激进（把独立粗体短行也算标题）</option>
+            </select>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <div class="row row--check">
+          <span class="row__label">长段切分</span>
+          <div class="row__control">
+            <label class="check" for="set-split-lines">
+              <input id="set-split-lines" class="control check__box" type="checkbox" data-key="splitLines" />
+              <span>自动切分挤在一起的长段</span>
+            </label>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <div class="row row--check">
+          <span class="row__label">阅读位置</span>
+          <div class="row__control">
+            <label class="check" for="set-restore-position">
+              <input
+                id="set-restore-position"
+                class="control check__box"
+                type="checkbox"
+                data-key="restorePosition"
+              />
+              <span>恢复上次阅读位置</span>
+            </label>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <div class="row row--check">
+          <span class="row__label">按站点记忆</span>
+          <div class="row__control">
+            <label class="check" for="set-remember-per-site">
+              <input
+                id="set-remember-per-site"
+                class="control check__box"
+                type="checkbox"
+                data-key="rememberPerSite"
+              />
+              <span>按站点分别记忆设置</span>
+            </label>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <div class="row row--check">
+          <span class="row__label">大纲</span>
+          <div class="row__control">
+            <label class="check" for="set-show-outline">
+              <input id="set-show-outline" class="control check__box" type="checkbox" data-key="showOutline" />
+              <span>打开阅读视图时显示大纲</span>
+            </label>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="sec-case">
+        <h2 id="sec-case" class="card__title">大小写</h2>
+
+        <div class="row row--check">
+          <span class="row__label">首字母大写</span>
+          <div class="row__control">
+            <label class="check" for="set-capitalize">
+              <input id="set-capitalize" class="control check__box" type="checkbox" data-key="capitalizeFirst" />
+              <span>每个单词首字母大写</span>
+            </label>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+
+        <p class="note">
+          只影响拉丁字母文字（英文等）：中日韩文字没有大小写，开启后对中文页面没有任何视觉变化。
+          这是<strong>渲染期变换</strong>，不会改动网页原文，关闭后立即恢复原样；每个词只把首字符转成大写，
+          其余字符保持原样，所以 iPhone、DNA 这类写法不会被破坏；纯数字、网址（URL）与邮箱地址会被跳过。
+        </p>
+
+        <div class="example">
+          <p class="example__label">效果示例</p>
+          <p class="example__line"><span class="example__tag">原文</span> an iPhone at the DNA lab costs 2024 dollars</p>
+          <p class="example__line">
+            <span class="example__tag example__tag--out">大写</span>
+            <span id="case-output" class="example__out">An IPhone At The DNA Lab Costs 2024 Dollars</span>
+          </p>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="sec-preview">
+        <h2 id="sec-preview" class="card__title">阅读预览</h2>
+        <p class="note">
+          下面三段文字使用当前设置渲染：字体、字号、行高、列宽与段落间距都来自同一套
+          <code>--ezr-*</code> 变量，与页面里的阅读视图完全一致。当前段间距
+          <strong id="out-gap-inline">26.6px</strong>（必须大于 1.5 倍行高）。
+        </p>
+
+        <div id="preview" class="reader">
+          <h3>Riverfront plan clears the council after a decade of stalemate</h3>
+          <p>
+            The city council voted on Tuesday to approve a sweeping rezoning plan that would allow developers to
+            build as many as nine thousand homes along the riverfront, ending a decade of stalemate over the future
+            of the old freight yards. Officials said the agreement, reached after eleven hours of negotiation, would
+            set aside nearly a third of the site for parks and a new elementary school.
+          </p>
+          <p>
+            Not everyone was pleased. Residents of the adjacent mill district argued that the plan's affordable
+            housing quota, set at eighteen percent, is far too low for a neighbourhood where median rents have
+            climbed by more than half since 2019. "We are not against growth," one longtime owner told the chamber.
+            "We are against growth that pushes us out."
+          </p>
+          <p>
+            Construction is expected to begin next spring, though two lawsuits filed last month could delay the first
+            phase by a year or more. City planners concede that the timetable is optimistic, but they point to a
+            similar project across the river that broke ground within eighteen months of approval and now houses
+            some four thousand people.
+          </p>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="sec-storage">
+        <h2 id="sec-storage" class="card__title">存储</h2>
+        <div class="row row--actions">
+          <span class="row__label">恢复默认</span>
+          <div class="row__control">
+            <button id="reset" class="button button--danger" type="button">恢复默认设置</button>
+          </div>
+          <span class="row__value row__value--muted"></span>
+        </div>
+        <p class="note">
+          设置保存在浏览器扩展存储 <code>chrome.storage.local</code> 中：<code>ezr:settings:default</code>
+          保存全局默认值，<code>ezr:settings:byOrigin</code> 保存「按站点分别记忆」产生的站点覆盖项，阅读位置保存在
+          <code>ezr:pos</code>。本页只写入全局默认值；阅读视图内的修改会按「按站点记忆」开关写入对应位置。
+        </p>
+      </section>
+
+      <footer class="page__foot">
+        <p class="note">EZ-Reader · 本地阅读与系统字体 · 联网翻译由用户主动触发</p>
+      </footer>
+    </div>
+
+    <script type="module" src="options.js"></script>
+    <script type="module" src="translation-options.js"></script>
+    <script type="module" src="wordbook.js"></script>
+  </body>
+</html>

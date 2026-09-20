@@ -1,0 +1,405 @@
+/*
+ * EZ-Reader options page styles.
+ *
+ * Same visual language as the popup, one scale larger. Separate file because
+ * extension pages run under `style-src 'self'`; only local/system fonts are
+ * referenced and nothing is fetched from the network.
+ *
+ * The reading preview consumes the `--ezr-*` custom properties produced by
+ * `cssVarsFor()` in src/core/styles.js, which is exactly what the in-page reader
+ * uses — so this preview cannot drift from the real thing.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --ui-bg: #ffffff;
+  --ui-surface: #f5f6f8;
+  --ui-fg: #1f2328;
+  --ui-muted: #656d76;
+  --ui-border: #d7dbe0;
+  --ui-accent: #3c73cb;
+  --ui-accent-fg: #ffffff;
+  --ui-danger-bg: #fdecec;
+  --ui-danger-fg: #8c1d18;
+
+  --ui-radius: 10px;
+  --ui-max: 1040px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ui-bg: #1c1f24;
+    --ui-surface: #24282e;
+    --ui-fg: #e8eaed;
+    --ui-muted: #9aa3ad;
+    --ui-border: #383d45;
+    --ui-accent: #8cb6f3;
+    --ui-accent-fg: #12243f;
+    --ui-danger-bg: #3a1d1d;
+    --ui-danger-fg: #ffb4ac;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  accent-color: var(--ui-accent);
+  font: 14px/1.6 system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft YaHei', sans-serif;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: var(--ui-max);
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+}
+
+/* -------------------------------------------------------------------- header */
+
+.page__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.page__lead {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ui-muted);
+}
+
+.saved {
+  align-self: flex-start;
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: var(--ui-accent-fg);
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-fg);
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------------------- cards */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+}
+
+.card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------- rows */
+
+.row {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) 168px;
+  align-items: center;
+  gap: 14px;
+}
+
+.row--check,
+.row--actions {
+  align-items: center;
+}
+
+.row__label {
+  font-size: 13px;
+  color: var(--ui-muted);
+}
+
+.row__control {
+  min-width: 0;
+}
+
+.row__value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.row__value--muted {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ controls */
+
+.control {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.range {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--ui-accent);
+}
+
+.control:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.check__box {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ui-accent);
+}
+
+.headings-readout {
+  display: block;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+/* ------------------------------------------------------------------- buttons */
+
+.button {
+  padding: 8px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--ui-accent);
+}
+
+.button--danger {
+  border-color: var(--ui-border);
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-fg);
+}
+
+.button--danger:hover {
+  border-color: var(--ui-danger-fg);
+}
+
+/* --------------------------------------------------------------------- notes */
+
+.note {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+
+.note code {
+  padding: 1px 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-bg);
+  font-family: Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.note strong {
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------- example */
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg);
+}
+
+.example__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+
+.example__line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.example__tag {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.example__tag--out {
+  color: var(--ui-accent);
+}
+
+.example__out {
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------- preview */
+
+/*
+ * Every value below comes from the shared `--ezr-*` variables; the fallbacks
+ * only apply during the first paint, before options.js runs.
+ */
+.reader {
+  max-width: var(--ezr-measure, 44rem);
+  padding: 20px 24px;
+  border: 1px solid var(--ezr-border, var(--ui-border));
+  border-radius: var(--ui-radius);
+  background: var(--ezr-bg, var(--ui-bg));
+  color: var(--ezr-fg, var(--ui-fg));
+  font-family: var(--ezr-font, Georgia, 'Iowan Old Style', 'Times New Roman', serif);
+  font-size: var(--ezr-size-body, 16px);
+  line-height: var(--ezr-lh, 1.6);
+  zoom: var(--ezr-scale, 1);
+  text-align: left;
+}
+
+.reader > * {
+  margin: 0;
+}
+
+/* 段落间距：唯一事实来源是 src/core/paragraph-gap.js，始终 > 1.5 × 行高 */
+.reader > * + * {
+  margin-block-start: var(--ezr-gap, 26px);
+}
+
+.reader h1 {
+  font-size: var(--ezr-size-h1, 30px);
+  font-weight: 700;
+}
+
+.reader h2 {
+  font-size: var(--ezr-size-h2, 25px);
+  font-weight: 700;
+}
+
+.reader h3 {
+  font-size: var(--ezr-size-h3, 21px);
+  font-weight: 700;
+}
+
+.reader h4 {
+  font-size: var(--ezr-size-h4, 18px);
+  font-weight: 700;
+}
+
+.reader h5 {
+  font-size: var(--ezr-size-h5, 17px);
+  font-weight: 700;
+}
+
+.reader h6 {
+  font-size: var(--ezr-size-h6, 16px);
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------------- footer */
+
+.page__foot {
+  padding-top: 4px;
+  border-top: 1px solid var(--ui-border);
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .row__value {
+    text-align: left;
+  }
+}
+/* Translation configuration shares the existing settings card styling. */
+.translation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+.translation-grid label, .translation-field { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.translation-field { margin: 18px 0; }
+.translation-field input, .translation-field select, .translation-grid select { width: 100%; min-height: 38px; }
+.translation-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.translation-preferences { padding: 16px; margin: 16px 0; border: 1px solid var(--ui-border); border-radius: 10px; }
+.translation-preferences .translation-toggle + .translation-toggle { margin-top: 14px; }
+.translation-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.wordbook-count { font-size: 12px; font-weight: 400; opacity: .6; margin-left: 8px; }
+.wordbook-search { width: 100%; min-height: 38px; margin: 20px 0 8px; }
+.wordbook-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
+.wordbook-row > div { min-width: 0; }
+.wordbook-row strong, .wordbook-row span { display: block; overflow-wrap: anywhere; }
+.wordbook-row span { font-size: 13px; opacity: .75; margin-top: 3px; }
+.wordbook-row button { flex: none; font-size: 12px; }
+.wordbook-help summary { cursor: pointer; }
+.wordbook-help p { line-height: 1.8; }
+#translation-save { background: var(--ui-accent); color: var(--ui-accent-fg); border-color: var(--ui-accent); }
+@media (max-width: 520px) { .translation-grid { grid-template-columns: 1fr; } }

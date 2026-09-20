@@ -1,0 +1,19 @@
+# Generated extension bundle and browser test profiles / screenshots
+/dist/
+/test-artifacts/
+
+# Dependencies and local configuration
+/node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and editor / OS files
+*.log
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

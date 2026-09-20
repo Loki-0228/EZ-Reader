@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light dark;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #20334d;
+  background: var(--panel-bg);
+  --panel-bg: #f5f8ff;
+  --muted: #6d7c93;
+  --mark-bg: #e1eafd;
+  --mark-fg: #315f9c;
+  --primary: #3c73cb;
+  --primary-hover: #2d5eac;
+  --primary-fg: #fff;
+  --focus: #8baff0;
+  --notice: #965626;
+}
+
+* { box-sizing: border-box; }
+html { overflow: hidden; }
+/* The browser owns the outer window shape. Fill it uniformly; round only the controls. */
+body { margin: 0; width: 320px; background: var(--panel-bg); }
+.panel {
+  padding: 23px;
+  overflow: hidden;
+  background: var(--panel-bg);
+}
+header { display: flex; gap: 12px; align-items: center; margin-bottom: 22px; }
+.mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--mark-bg);
+  color: var(--mark-fg);
+  font-weight: 750;
+}
+h1 { font-size: 19px; letter-spacing: -.4px; margin: 0; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  padding: 18px 20px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background .15s;
+}
+.toolbar-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+button:hover:not(:disabled) { background: var(--primary-hover); }
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+button:disabled { opacity: .55; cursor: default; }
+#notice { font-size: 12px; color: var(--notice); margin: 12px 0 0; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #e8eef8;
+    --panel-bg: #1b2535;
+    --muted: #a4b4ce;
+    --mark-bg: #2b405f;
+    --mark-fg: #bad2ff;
+    --primary: #8cb6f3;
+    --primary-hover: #a8c8f7;
+    --primary-fg: #12243f;
+    --focus: #b6d0fa;
+    --notice: #e8bb86;
+  }
+}

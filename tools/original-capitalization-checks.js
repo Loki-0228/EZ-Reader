@@ -1,0 +1,41 @@
+export async function originalCapitalizationChecks(page, iso, sh, check, until) {
+  const initialBody = await page.evaluate('document.body.innerHTML');
+  await page.evaluate(`
+    const sample=document.createElement('section');sample.id='caps-sample';
+    sample.innerHTML='<p id="caps-text" style="text-transform: lowercase; color: rgb(10, 20, 30)">original words <a id="caps-link" href="#caps">linked words</a> <code id="caps-code">keep_CODE</code> <span contenteditable="true" id="caps-edit">editable_WORDS</span></p><button id="caps-button">button_WORDS</button>';
+    document.body.appendChild(sample);window.capsOriginal=sample.innerHTML;
+    window.capsRefs=[document.getElementById('caps-text').firstChild,document.getElementById('caps-link')];
+    window.capsClicks=0;sample.addEventListener('click',event=>{if(event.target===capsRefs[1]){event.preventDefault();window.capsClicks++;}});
+    window.capsProtected=['caps-code','caps-edit','caps-button'].map(id=>getComputedStyle(document.getElementById(id)).textTransform);
+  `);
+  await sh("sh.querySelector('.ezr-toggle-caps').click();");
+  check('原网页大写按钮可用，实际文字样式生效而文本节点不变',await page.evaluate("getComputedStyle(document.getElementById('caps-text')).textTransform==='capitalize' && document.getElementById('caps-text').firstChild===capsRefs[0] && capsRefs[0].data==='original words ' && document.getElementById('caps-link')===capsRefs[1]"));
+  check('原网页大写跳过代码、编辑区和按钮，未继承正文大写',await page.evaluate("JSON.stringify(['caps-code','caps-edit','caps-button'].map(id=>getComputedStyle(document.getElementById(id)).textTransform))===JSON.stringify(capsProtected)"));
+  await page.evaluate("document.getElementById('caps-link').click()");
+  check('原网页链接与依赖事件目标的委托处理保持可用',await page.evaluate('capsClicks===1'));
+  await iso(`(()=>{const text=document.getElementById('caps-text').firstChild,range=document.createRange();range.setStart(text,0);range.setEnd(text,8);const selection=document.getSelection();selection.removeAllRanges();selection.addRange(range);text.parentElement.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));})()`);
+  await until(()=>sh("return !sh.querySelector('.ezr-original-selection .ezr-translation').hidden;"),'Original capitalization selection missing');
+  check('大写显示下划词仍读取原始词形，不改变翻译与缓存输入',await sh("return sh.querySelector('.ezr-original-selection .ezr-translation-source').textContent==='original';"));
+  await sh("sh.querySelector('.ezr-btn-settings').click();");
+  check('原网页设置也提供可用的大写开关',await sh("const input=sh.querySelector('[data-ezr-setting=capitalizeFirst]');return !input.disabled && input.getClientRects().length>0 && input.checked;"));
+  await sh("sh.querySelector('[data-ezr-setting=capitalizeFirst]').click();sh.querySelector('.ezr-settings-close').click();");
+  check('关闭大写后原有内联样式和 DOM 精确还原',await page.evaluate("document.getElementById('caps-sample').innerHTML===capsOriginal"));
+  await sh("sh.querySelector('.ezr-toggle-caps').click();");
+  await page.evaluate("const p=document.createElement('p');p.id='caps-dynamic';p.textContent='newly loaded words';document.getElementById('caps-sample').appendChild(p);");
+  await until(()=>page.evaluate("getComputedStyle(document.getElementById('caps-dynamic')).textTransform==='capitalize'"),'Dynamic capitalization missing');
+  check('原网页动态加载的新文字也应用大写显示',true);
+  await page.evaluate("document.getElementById('caps-dynamic').firstChild.data='updated words';document.getElementById('caps-dynamic').style.color='red';");
+  await sh("sh.querySelector('.ezr-btn-original').click();");
+  await until(()=>sh("return !sh.host.hasAttribute('data-ezr-original');"),'Reader switch failed');
+  check('切换到阅读视图会还原网页大写样式，并保留网站的新文字和样式',await page.evaluate("getComputedStyle(document.getElementById('caps-text')).textTransform==='lowercase' && document.getElementById('caps-dynamic').textContent==='updated words' && document.getElementById('caps-dynamic').style.color==='red' && !document.getElementById('caps-dynamic').style.textTransform"));
+  await sh("sh.querySelector('.ezr-btn-original').click();");
+  check('返回原网页恢复大写显示，重复切换不创建包装节点',await page.evaluate("getComputedStyle(document.getElementById('caps-text')).textTransform==='capitalize' && document.getElementById('caps-text').firstChild===capsRefs[0]"));
+  await sh("sh.querySelector('.ezr-btn-pick').click();");
+  check('选择区域期间暂停大写样式，控件保持原始结构',await page.evaluate("getComputedStyle(document.getElementById('caps-text')).textTransform==='lowercase' && document.getElementById('caps-text').firstChild===capsRefs[0]"));
+  await page.session.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27},page.sessionId);
+  check('取消选区后恢复原网页大写',await page.evaluate("getComputedStyle(document.getElementById('caps-text')).textTransform==='capitalize'"));
+  await sh("sh.querySelector('.ezr-toggle-caps').click();");
+  check('停用大写不覆盖网站后续修改的内容或样式',await page.evaluate("document.getElementById('caps-dynamic').textContent==='updated words' && document.getElementById('caps-dynamic').getAttribute('style')==='color: red;'"));
+  await page.evaluate("document.getElementById('caps-sample').remove();getSelection().removeAllRanges();window.scrollTo(0,0);");
+  check('大写关闭后整页 DOM 还原，无辅助标记残留',await page.evaluate('document.body.innerHTML')===initialBody);
+}

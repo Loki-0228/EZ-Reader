@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EZ-Reader</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="panel">
+    <header><span class="mark" aria-hidden="true">EZ</span><div><h1>EZ-Reader</h1><p>阅读 · 翻译 · 学习</p></div></header>
+    <button id="primary" type="button" disabled>打开工具栏<svg class="toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 7.5h.01M9 7.5h.01M12 7.5h.01"/></svg></button>
+    <p id="notice" role="status" aria-live="polite" hidden></p>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

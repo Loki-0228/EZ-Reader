@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Original page and region selection</title>
+  <style>
+    body { margin: 0; font: 18px/1.6 Georgia, serif; background: #f4f5f7; }
+    body > main, body > section { max-width: 640px; margin: 100px auto 60px; padding: 24px; background: white; border: 2px solid #345; }
+    p { margin: 0 0 16px; }
+    #empty { width: 100px; height: 50px; background: #ddd; }
+  html > :not(head):not(body) { display: block !important; position: relative !important; padding: 18px !important; border: 8px solid #b00 !important; background: #ffbda6 !important; transform: scale(.9) !important; }
+  </style>
+</head>
+<body>
+  <main id="source-a"><p id="first">Original <strong id="inline-target">alpha</strong>.</p><button id="source-button">Original button</button></main>
+  <section id="source-b"><p id="second">Original <a id="source-link" href="#navigated">beta</a>.</p><div id="empty"></div></section>
+  <script>
+    window.fixtureClicks = 0;
+    document.getElementById('source-button').addEventListener('click', () => { window.fixtureClicks += 1; });
+  </script>
+</body>
+</html>

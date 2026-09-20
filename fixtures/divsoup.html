@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Tightest Text in the Building &mdash; Working Notes</title>
+<meta name="ezr-fixture" content="divsoup">
+<meta name="description" content="div soup fixture: no semantic heading tags inside #content, heading levels expressed purely through font size and weight, deliberately tight body spacing.">
+<style>
+  :root { color-scheme: light; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #eef0f3;
+    color: #16181c;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.45;
+  }
+  a { color: #1b4f9c; }
+  .app-shell { min-height: 100vh; }
+  .masthead { background: #101418; color: #f2f4f7; }
+  .masthead .masthead-inner { max-width: 1080px; margin: 0 auto; padding: 12px 18px; }
+  .brand-mark { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
+  .brand-tag { font-size: 12px; color: #9aa4b2; }
+  .toolbar {
+    background: #1b2027;
+    border-top: 1px solid #2a313a;
+    font-size: 13px;
+    color: #c9d1da;
+  }
+  .toolbar .toolbar-inner { max-width: 1080px; margin: 0 auto; padding: 7px 18px; }
+  .toolbar a { color: #c9d1da; text-decoration: none; margin-right: 14px; }
+  nav.main-menu { background: #ffffff; border-bottom: 1px solid #d8dde4; }
+  nav.main-menu .menu-inner { max-width: 1080px; margin: 0 auto; padding: 8px 18px; font-size: 13px; }
+  nav.main-menu a { margin-right: 16px; text-decoration: none; color: #333b45; }
+  .breadcrumb { max-width: 1080px; margin: 0 auto; padding: 10px 18px 0; font-size: 12px; color: #6d7681; }
+  .breadcrumb a { color: #6d7681; text-decoration: none; }
+  .cookie-banner {
+    background: #fff8e1;
+    border-bottom: 1px solid #eadfb8;
+    font-size: 12px;
+    color: #4d4326;
+  }
+  .cookie-banner .cookie-inner { max-width: 1080px; margin: 0 auto; padding: 8px 18px; }
+  .layout { max-width: 1080px; margin: 0 auto; padding: 18px; }
+  .main-col { display: inline-block; vertical-align: top; width: 68%; }
+  .side-col { display: inline-block; vertical-align: top; width: 29%; margin-left: 2%; }
+  .card { background: #ffffff; border: 1px solid #dde2e8; padding: 22px 26px 30px; }
+  .side-card { background: #ffffff; border: 1px solid #dde2e8; padding: 14px 16px; margin-bottom: 14px; }
+  .side-card .side-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .side-card a { display: block; font-size: 13px; padding: 3px 0; text-decoration: none; }
+  .promo-box { background: #e8f0fe; border: 1px solid #c7d8f7; padding: 14px 16px; font-size: 13px; margin-bottom: 14px; }
+  .advert-slot { background: #f5f6f8; border: 1px dashed #c6ccd4; padding: 26px 10px; text-align: center; font-size: 12px; color: #7b838d; margin-bottom: 14px; }
+  footer.page-footer { background: #101418; color: #b9c2cc; margin-top: 26px; font-size: 13px; }
+  footer.page-footer .footer-inner { max-width: 1080px; margin: 0 auto; padding: 20px 18px 40px; }
+  footer.page-footer a { color: #b9c2cc; display: block; padding: 2px 0; text-decoration: none; }
+  .footer-col { display: inline-block; vertical-align: top; width: 31%; margin-right: 2%; }
+  .footer-col .col-head { color: #f2f4f7; font-weight: 700; margin-bottom: 6px; }
+  .share-strip { border-top: 1px solid #2a313a; margin-top: 16px; padding-top: 12px; }
+  .share-strip a { display: inline-block; margin-right: 14px; }
+
+  /* framework-ish utility classes; the article region also carries inline styles so the
+     computed values are unambiguous and deterministic. */
+  .stack > * { box-sizing: border-box; }
+  .grid { width: 100%; }
+  .cell-12 { width: 100%; }
+  .widget-block { margin-bottom: 10px; }
+  .inner { margin: 0; }
+  .quote-box { border-left: 3px solid #c9d1da; padding-left: 12px; }
+  .stat-line { font-size: 15px; color: #3d454f; }
+</style>
+</head>
+<body data-ezr-fixture="divsoup">
+
+<div class="app-shell">
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand-mark">Working Notes</div>
+      <div class="brand-tag">Tools, habits, and the paperwork in between</div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-inner">
+      <a href="#content">Toolbar home</a>
+      <a href="#content">Saved items</a>
+      <a href="#content">Newsletters</a>
+      <a href="#content">Podcasts</a>
+      <a href="#content">Account</a>
+      <a href="#content">Toolbar help</a>
+    </div>
+  </div>
+
+  <nav class="main-menu" aria-label="Site sections">
+    <div class="menu-inner">
+      <a href="#content">Workplace</a>
+      <a href="#content">Typography</a>
+      <a href="#content">Research</a>
+      <a href="#content">Software</a>
+      <a href="#content">Opinion</a>
+      <a href="#content">Archive</a>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="#content">Working Notes</a> &rsaquo; <a href="#content">Typography</a> &rsaquo; <a href="#content">The Tightest Text in the Building</a>
+  </div>
+
+  <div class="cookie-banner">
+    <div class="cookie-inner">This site uses cookies to remember your reading position and to measure article performance. <a href="#content">Cookie settings</a> &middot; <a href="#content">Accept all</a></div>
+  </div>
+
+  <div class="layout">
+    <div class="main-col">
+      <div class="card">
+
+        <!-- ================= ARTICLE REGION (div soup) ================= -->
+        <div id="content" class="page-root">
+          <div class="grid">
+            <div class="cell-12">
+              <div class="stack">
+
+                <div class="widget-block">
+                  <div class="row-head">
+                    <div style="font-size: 30px; font-weight: 700; line-height: 1.12; margin-bottom: 6px;">The Tightest Text in the Building</div>
+                  </div>
+                  <div class="sub-line" style="font-size: 12px; line-height: 1.3; color: #6d7681; margin: 2px 0;">Words by Dana Whitfield</div>
+                  <div class="date-line" style="font-size: 12px; line-height: 1.3; color: #6d7681; margin: 2px 0;">March 4, 2024</div>
+                </div>
+
+                <div class="block-a">
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">Every large organisation contains at least one document that everybody is required to read and nobody wants to open. It is usually a policy update, a restructuring memo, or a quarterly review running to forty pages of unbroken explanation, and it arrives as a link in a message that says, without irony, please read carefully before Friday. The content is rarely unreasonable. The problem is that the document has been set so tightly, at such a narrow line height and with such meagre space between paragraphs, that the reader experiences it as a single undifferentiated wall of text from the first line to the last.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">This is not a matter of taste or of aesthetic preference. Reading is a physical process as well as a cognitive one, and the eye does not travel smoothly along a line of type. It moves in short jumps, lands, recognises a few characters, and jumps again, and at the end of each line it must perform a return sweep to a precise position on the line below. That return sweep is the fragile part. If the preceding line is long, if the leading is thin, or if the paragraph boundary is invisible, the eye lands on the wrong line and the reader must reconstruct where the sentence went, a small correction that costs a fraction of a second and repeats hundreds of times per document.</div>
+                </div>
+
+                <div class="block-b">
+                  <div class="inner">
+                    <div style="font-size: 21px; font-weight: 600; line-height: 1.25; margin: 18px 0 6px;">The Default That Nobody Chose</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">Ask who decided that workplace documents should be set at a line height of roughly one and a third, and the honest answer is that nobody did. The setting arrived through a chain of inherited defaults: a word processor template from the nineties, a corporate style guide that specified fonts but never mentioned spacing, a document management system that converts everything to a single house layout, and a web framework whose default stylesheet was written for dashboards rather than for prose. Each decision was locally sensible and none of them was about reading. Together they produce a page that meets every formal requirement and quietly makes sustained attention harder than it needs to be.</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The drift is easy to demonstrate. Print conventions settled, over more than a century of trial and error, on a body line height of about one and a half times the type size, a first-line indent or a full blank line between paragraphs, and a measure of sixty to seventy-five characters. Screens inherited the type sizes and discarded the spacing, partly because scrolling made vertical space feel expensive and partly because early displays had so few pixels that generous leading looked wasteful. The displays improved by an order of magnitude, and the spacing never came back.</div>
+                  </div>
+                </div>
+
+                <div class="block-c">
+                  <div style="font-size: 17px; font-weight: 700; line-height: 1.3; margin: 14px 0 4px;">Where the Numbers Come From</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">We measured the reading views of two hundred internal documents from eleven organisations, capturing the computed line height, the vertical gap between consecutive paragraphs, and the measure in characters. The median line height was 1.36 and the median paragraph gap was four pixels, which at a body size of sixteen pixels means that a new paragraph begins roughly a quarter of a line below the previous one. The median measure was ninety-four characters. In other words, the typical document in our sample asks the reader to track a very long line, at a very small leading, with paragraph breaks that are almost invisible at normal viewing distance.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The distribution matters more than the median. A small group of documents, mostly authored by people with a publishing background, sat comfortably inside the print conventions, with line heights near 1.55 and clear paragraph separation. The rest clustered tightly around the framework default, which is to say that the variation between organisations was far smaller than the variation within them. Whatever produces tight text, it is not a considered house style that different teams arrived at independently. It is a shared inheritance, applied by default and rarely examined, which is precisely why it is so uniform and so easy to correct once somebody notices.</div>
+                </div>
+
+                <div class="block-d">
+                  <div style="font-size: 21px; font-weight: 600; line-height: 1.25; margin: 18px 0 6px;">What Tight Leading Actually Costs</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">In a controlled comparison, forty-one participants read the same three documents under two layouts: the original tight setting and a re-spaced version with a line height of 1.6 and a paragraph gap equal to one and a half lines. Reading speed fell by about six percent in the re-spaced condition, which is the result most people predict. Time to voluntary stop, however, rose by more than half, and the number of times readers scrolled backwards to recover their place fell by roughly a third. Participants also reported, in free-text responses, that the re-spaced documents felt shorter, even though every one of them was longer on screen and required more scrolling to finish.</div>
+                  <div class="quote-box" style="font-size: 16px; line-height: 1.35; margin: 4px 0">One participant put it in a way that we have since quoted in every presentation: the words were exactly the same, but for the first time I could see where the writer had decided that one idea was finished. That observation captures the mechanism better than our measurements do. Paragraph spacing is not decoration. It is the visible trace of the author's decisions about structure, and when it disappears, the reader has to re-derive those decisions from grammar and context, which is work that the layout could have done for free.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">There is a cost to the fix as well, and it should be stated honestly. Generous spacing pushes content below the fold, which means more scrolling and, on a fixed-height panel such as a code review or a chat pane, fewer visible lines. Readers who are scanning for a specific clause rather than reading linearly find that the extra space slows them down, and several participants in our study said so directly. The right setting therefore depends on the task: extraction rewards density, and comprehension rewards air. A single global default will always be wrong for somebody, which is an argument for making the setting adjustable rather than for choosing one value and defending it.</div>
+                </div>
+
+                <div class="block-e">
+                  <div class="inner">
+                    <div style="font-size: 17px; font-weight: 700; line-height: 1.3; margin: 14px 0 4px;">The Case of the Missing Paragraph Break</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The most common defect we found was not a small line height but an absent paragraph gap. In many of the documents we inspected, paragraphs were separated by a bottom margin of four pixels, which is visually indistinguishable from the space between two lines of the same paragraph at typical viewing distance. Readers described this as text that never seemed to end. The effect is not additive but multiplicative: a tight leading makes each line harder to leave, and an invisible paragraph break removes the natural resting points that would otherwise let a reader pause, check their understanding, and continue, so that the two defects compound into the sensation of a document that resists being read.</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The remedy costs nothing to apply and nothing to reverse. A reading tool can raise the line height, insert a real gap between blocks, and narrow the measure at the moment of display, without editing the original file and without asking the author to change anything. Because the transformation happens in a layer above the page, it leaves the source document untouched, which matters for documents that are signed, versioned, or subject to a retention policy. The reader gets a page they can finish, the organisation keeps the file it already approved, and nobody has to negotiate a change to the corporate template.</div>
+                  </div>
+                  <div class="stat-line" style="font-size: 16px; line-height: 1.35; margin: 4px 0">Across the sample, four pixels of paragraph gap was the single strongest predictor of early abandonment, stronger than line height, measure, or document length. Readers abandoned tight documents after a median of nineteen minutes; the same readers, given the same text with a real gap between paragraphs, continued for thirty-one.</div>
+                </div>
+
+                <div class="block-f">
+                  <div class="inner-run">
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">A second effect is easy to overlook because it never appears in a measurement of speed. Readers who cannot see where a paragraph ends start to treat the whole document as a single argument, which changes how they remember it afterwards. They summarise the text as one long complaint or one long justification rather than as a sequence of claims, and when they are asked to act on it they frequently act on the wrong part.</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The opposite failure is just as common in documents that have been over-formatted in an attempt to compensate. When every other sentence is bold, when headings appear at three different sizes with no consistent meaning, and when bullet points interrupt arguments that would read better as prose, the reader loses the ability to tell which distinctions matter and the page becomes noise.</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">What survives both failures is hierarchy that carries information. A heading should mark a real change of subject, a paragraph break should mark a real change of step, and emphasis should be reserved for the few phrases that would change a reader's decision if they were missed, which in most documents is fewer than a dozen across the whole text.</div>
+                  </div>
+                </div>
+
+                <div class="block-g">
+                  <div style="font-size: 21px; font-weight: 600; line-height: 1.25; margin: 18px 0 6px;">What Teams Can Do on Monday</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The first and cheapest intervention is to stop treating vertical space as a resource to be conserved. A document that takes ten percent more scrolling to read is not a worse document; it is a document that more people will finish. The second is to fix the template rather than the individual file, because the default is what propagates: a single change to the body style of the corporate template will reach every document produced after it, including the ones that nobody has written yet. The third is to set the measure deliberately, since a line of ninety characters is difficult to track regardless of how generous the leading happens to be.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">For documents that must remain in their original form, a reading layer offers a practical alternative. Most people already read long material through some kind of viewer, whether that is a browser, a document preview, or a phone application, and any of those can adjust spacing without touching the file. The important property is reversibility: the reader should be able to leave the adjusted view and see exactly the document that was published, byte for byte, with nothing added, removed, or rewritten. A reading aid that silently alters the record is a liability in any organisation that has to answer questions about what a document actually said.</div>
+                </div>
+
+                <div class="block-h">
+                  <div class="inner">
+                    <div style="font-size: 17px; font-weight: 700; line-height: 1.3; margin: 14px 0 4px;">Reading on a Laptop in a Café</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">Laboratory conditions flatter generous typography, and it is fair to ask whether the effect survives contact with an actual working day. We asked a subset of participants to read in their usual environment, on their own machines, with whatever interruptions they normally tolerate, and to record when they stopped. The absolute numbers fell in every condition, as anyone would expect, but the gap between tight and re-spaced documents did not close. If anything it widened, because the tight documents were the first thing abandoned when a message arrived and the re-spaced documents were returned to afterwards, a pattern that suggests spacing is not a luxury enjoyed only by people with quiet offices.</div>
+                    <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">Small screens sharpen the same conclusion. On a laptop, a line height of 1.35 at sixteen pixels produces roughly twenty-two pixels per line, and a measure of ninety characters is impossible without horizontal crowding or aggressive hyphenation, so the reader receives the worst of both arrangements: lines too long to track and leading too thin to separate them. Narrowing the measure and raising the leading at the same time is the only combination that helps, and it is the combination that a display-time reading layer can apply consistently across every site a person happens to use.</div>
+                    <div class="sub-line" style="font-size: 16px; line-height: 1.35; margin: 4px 0">Editorial desk<br>Northgate House, 14 Cooper Street<br>Leeds LS1 4AB</div>
+                  </div>
+                </div>
+
+                <div class="block-i">
+                  <div style="font-size: 21px; font-weight: 600; line-height: 1.25; margin: 18px 0 6px;">The Limits of the Fix</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">Spacing is not a substitute for editing. A document that repeats itself, buries its conclusion in the fourth appendix, or uses three words where one would do will remain difficult to read no matter how beautifully it is set, and there is a real risk that a comfortable reading view makes bad prose more tolerable than it deserves to be. The tool addresses one specific obstacle, which is that dense stacked English paragraphs are physically tiring to move through, and it should be judged on that obstacle alone. Readers who expect a re-spaced document to be a better-argued document will be disappointed, and rightly so.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">A second limit is structural. When a page expresses its hierarchy through styling rather than through markup, a reading layer has to infer which lines are headings from their size, weight, and position, and inference can be wrong. A promotional line set in bold capitals may look exactly like a section heading. A byline may sit at the same size as a subheading. Systems that handle this well tend to be conservative: they promote a line only when the evidence is strong and they leave ambiguous lines as ordinary text, which occasionally flattens a real heading but almost never invents one.</div>
+                  <div style="font-size: 16px; line-height: 1.35; margin: 4px 0">The final limit is the reader's own patience with adjustment. Every setting that can be changed is a decision that somebody has to make, and most people will not make it. Sensible defaults therefore matter more than the range of options, and the defaults should be derived from what the document already does rather than from a fixed table: a page that is already well set needs almost nothing, while a page set at a line height of 1.35 and a four-pixel paragraph gap needs a substantial correction before it becomes comfortable to read for more than a few minutes at a time.</div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ================= END ARTICLE REGION ================= -->
+
+      </div>
+    </div>
+
+    <aside class="side-col">
+      <div class="promo-box">Promoted: <a href="#content">Subscribe to the Working Notes weekly digest</a> &mdash; one long read, every Thursday.</div>
+      <div class="advert-slot">Advertisement slot &middot; 300 &times; 250 &middot; <a href="#content">Advertise with us</a></div>
+      <div class="side-card">
+        <div class="side-title">Related reading</div>
+        <a href="#content">Why your line length is the real problem</a>
+        <a href="#content">A short history of the twelve-pixel default</a>
+        <a href="#content">Reading on phones without losing your place</a>
+        <a href="#content">The case against justified text on the web</a>
+      </div>
+      <div class="side-card">
+        <div class="side-title">Comments</div>
+        <a href="#content">128 comments</a>
+        <a href="#content">Join the discussion</a>
+        <a href="#content">Commenting guidelines</a>
+      </div>
+      <div class="side-card">
+        <div class="side-title">Share</div>
+        <a href="#content">Share on a social network</a>
+        <a href="#content">Share by e-mail</a>
+        <a href="#content">Copy a link</a>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="page-footer">
+    <div class="footer-inner">
+      <div class="footer-col">
+        <div class="col-head">More from Working Notes</div>
+        <a href="#content">Most read this week</a>
+        <a href="#content">Editor's picks</a>
+        <a href="#content">Newsletters</a>
+      </div>
+      <div class="footer-col">
+        <div class="col-head">Related articles</div>
+        <a href="#content">Set it looser: a practical checklist</a>
+        <a href="#content">What typographers know about fatigue</a>
+        <a href="#content">Ten templates that fight their own content</a>
+      </div>
+      <div class="footer-col">
+        <div class="col-head">Footer links</div>
+        <a href="#content">Contact the footer desk</a>
+        <a href="#content">Privacy and cookies</a>
+        <a href="#content">Terms of use</a>
+      </div>
+      <div class="share-strip">
+        Share this article:
+        <a href="#content">Twitter</a>
+        <a href="#content">Mastodon</a>
+        <a href="#content">LinkedIn</a>
+        <a href="#content">Hacker News</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

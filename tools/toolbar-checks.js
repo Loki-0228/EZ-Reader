@@ -1,0 +1,128 @@
+import path from 'node:path';
+import { CdpPage } from './cdp.js';
+import { originalCapitalizationChecks } from './original-capitalization-checks.js';
+
+export async function toolbarChecks(page, initialIso, check, artifacts) {
+  const session=page.session, pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const until=async (test,label)=>{for(let n=0;n<150;n++){if(await test())return;await pause(80);}throw Error(label);};
+  const extensionId=await initialIso('chrome.runtime.id'), base=new URL(await page.evaluate('location.href')).origin;
+  let world=await page.findContext('typeof window.__ezr === "object"');
+  const iso=code=>page.evaluate(code,{contextId:world});
+  const sh=code=>iso(`(()=>{const sh=document.getElementById('ezr-root').shadowRoot;${code}})()`);
+  const reconnect=async target=>{
+    const contextId=await target.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});
+    if(contextId===null)throw Error('Toolbar content script missing');
+    return code=>target.evaluate(code,{contextId});
+  };
+  let popup, options, sibling, other, otherWindow, savedTranslation;
+  try {
+    await initialIso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:false})");
+    const created=await session.send('Target.createTarget',{url:`chrome-extension://${extensionId}/pages/popup.html`,background:true});
+    popup=await CdpPage.attach(session,{targetId:created.targetId});
+    await popup.setViewport(320,215);
+    await until(()=>popup.evaluate("!!document.getElementById('primary') && !document.getElementById('primary').disabled"),'Popup not ready');
+    await popup.setViewport(320,Math.ceil(await popup.evaluate("document.body.getBoundingClientRect().height")));
+    check('扩展弹窗只有一个打开工具栏大按钮，没有快捷设置或其他入口',await popup.evaluate("document.querySelectorAll('button').length===1 && !document.querySelector('input,select') && document.getElementById('primary').textContent.includes('打开工具栏') && document.documentElement.scrollHeight<=innerHeight"));
+    // Background targets can pause CSS transitions; capture settled theme colors.
+    await popup.evaluate("document.getElementById('primary').style.transition='none'");
+    for(const theme of ['light','dark']) {
+      await session.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:theme}]},popup.sessionId);
+      await popup.screenshot({path:path.join(artifacts,theme==='light'?'toolbar-popup.png':'toolbar-popup-dark.png')});
+    }
+    await popup.evaluate("document.getElementById('primary').style.removeProperty('transition')");
+    await popup.evaluate("document.getElementById('primary').click()");
+    await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Toolbar did not open');
+    check('打开工具栏默认保留原网页，不自动提取或翻译',await sh("return sh.host.hasAttribute('data-ezr-original') && sh.querySelector('.ezr-article').children.length===0 && sh.querySelector('.ezr-full-bar').hidden;"));
+    check('原网页可用选区、大写和通用设置，排版控件置灰并说明原因',await sh("return !sh.querySelector('.ezr-btn-pick').disabled && !sh.querySelector('.ezr-toggle-caps').disabled && [...sh.querySelectorAll('.ezr-zoom button,.ezr-font-select,.ezr-btn-outline')].every(el=>el.disabled&&el.title.includes('简洁阅读')) && !sh.querySelector('.ezr-btn-settings').disabled && !sh.querySelector('.ezr-btn-translation').disabled;"));
+    check('简洁阅读和选择区域组成紧邻的左右两段按钮',await sh("const left=sh.querySelector('.ezr-btn-original'),right=sh.querySelector('.ezr-btn-pick'),a=left.getBoundingClientRect(),b=right.getBoundingClientRect();return left.parentElement===right.parentElement && left.parentElement.getAttribute('role')==='group' && Math.abs(a.right-b.left)<1 && a.top===b.top;"));
+    await sh("sh.querySelector('.ezr-zoom-in').click();");
+    check('点击置灰控件不会更改视图或设置',await sh("return sh.host.hasAttribute('data-ezr-original') && !sh.querySelector('.ezr-settings.is-open');") && (await iso("window.__ezrSend({type:'ezr:status'})")).settings.zoom===1);
+    savedTranslation=(await iso("chrome.runtime.sendMessage({type:'ezr:translation:config'})")).config;
+    await sh("sh.querySelector('.ezr-btn-settings').click();");
+    await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=enabled]').disabled;"),'Common settings did not load');
+    check('原网页直接打开通用设置，自动翻译控件实际可见可点击',await sh("const panel=sh.querySelector('.ezr-settings'),input=sh.querySelector('[data-ezr-translation-setting=preload]'),r=input.getBoundingClientRect();return sh.host.hasAttribute('data-ezr-original') && panel.classList.contains('is-open') && r.width>0 && sh.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===input;"));
+    check('原网页设置隐藏并禁用排版与词语学习，保留配色和 API 入口',await sh("return sh.querySelector('[data-ezr-setting=bodyFontSize]').disabled && !sh.querySelector('[data-ezr-setting=bodyFontSize]').getClientRects().length && !sh.querySelector('[data-ezr-translation-setting=wordCards]').getClientRects().length && !sh.querySelector('input[name=ezr-theme]').disabled && !!sh.querySelector('.ezr-translation-config');"));
+    const preference=async(key,value)=>{
+      await sh(`const input=sh.querySelector('[data-ezr-translation-setting=${key}]');if(input.disabled)throw Error('Preference disabled: ${key}');if(input.type==='checkbox')input.checked=${JSON.stringify(value)};else input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('change'));`);
+      await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=enabled]').disabled;"),'Preference write did not finish');
+    };
+    await preference('preload',true);await preference('source','en');await preference('target','ja');
+    await preference('provider','deepseek');await preference('model','deepseek-chat');
+    const changed=(await iso("chrome.runtime.sendMessage({type:'ezr:translation:config'})")).config;
+    check('原网页可保存自动翻译、服务、语言和模型，全文工具同步服务',changed.preload && changed.source==='en' && changed.target==='ja' && changed.provider==='deepseek' && changed.model==='deepseek-chat' && await sh("return sh.querySelector('.ezr-full-provider').value==='deepseek' && sh.host.hasAttribute('data-ezr-original');"));
+    await preference('enabled',false);
+    check('关闭划词后自动翻译禁用，全文翻译的语言与服务仍可调整',await sh("return sh.querySelector('[data-ezr-translation-setting=preload]').disabled && !sh.querySelector('[data-ezr-translation-setting=provider]').disabled && !sh.querySelector('[data-ezr-translation-setting=target]').disabled;"));
+    await preference('enabled',true);
+    await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:${JSON.stringify(savedTranslation)}})`);
+    await until(()=>sh(`return sh.querySelector('[data-ezr-translation-setting=preload]').checked===${savedTranslation.preload} && sh.querySelector('[data-ezr-translation-setting=provider]').value===${JSON.stringify(savedTranslation.provider)};`),'External preference changes did not sync');
+    check('外部翻译偏好变更同步回已打开的设置面板',true);
+    await page.screenshot({path:path.join(artifacts,'toolbar-settings-original.png')});
+    await page.setViewport(320,640);
+    check('窄屏原网页设置不溢出，关闭按钮与底部操作保持可见',await sh("const panel=sh.querySelector('.ezr-settings').getBoundingClientRect(),close=sh.querySelector('.ezr-settings-close').getBoundingClientRect(),foot=sh.querySelector('.ezr-settings-foot').getBoundingClientRect();return panel.left>=0 && panel.right<=innerWidth && close.top>=0 && foot.bottom<=innerHeight && sh.querySelector('.ezr-settings-scroll').scrollWidth<=sh.querySelector('.ezr-settings-scroll').clientWidth;"));
+    await page.screenshot({path:path.join(artifacts,'toolbar-settings-original-mobile.png')});
+    await session.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27},page.sessionId);
+    check('原网页 Esc 关闭设置并保留工具栏',await sh("return !sh.querySelector('.ezr-settings.is-open') && sh.host.hasAttribute('data-ezr-original');"));
+    check('窄屏左右两段按钮不会各自换行',await sh("const a=sh.querySelector('.ezr-btn-original').getBoundingClientRect(),b=sh.querySelector('.ezr-btn-pick').getBoundingClientRect();return a.top===b.top && a.left>=0 && b.right<=innerWidth;"));
+    await page.setViewport(1280,900);
+    await originalCapitalizationChecks(page,iso,sh,check,until);
+    await page.screenshot({path:path.join(artifacts,'toolbar-original.png')});
+    // Capture the toolbar against matching page colors so its outline and shadow can be reviewed.
+    await page.evaluate("const style=document.createElement('style');style.id='toolbar-page-preview';style.textContent='html,body,body *:not(#ezr-root){background-color:#16181c!important;color:#e6e6e6!important;border-color:#44474b!important}';document.head.appendChild(style);");
+    await iso("window.__ezrSend({type:'ezr:update-settings',patch:{theme:'dark'}})");
+    await page.screenshot({path:path.join(artifacts,'toolbar-original-dark.png')});
+    await iso("window.__ezrSend({type:'ezr:update-settings',patch:{theme:'light'}})");
+    await page.evaluate("document.getElementById('toolbar-page-preview').remove();");
+    await sh("sh.querySelector('.ezr-btn-original').click();");
+    await until(()=>sh("return !sh.host.hasAttribute('data-ezr-original') && sh.querySelectorAll('.ezr-para').length>10;"),'Lazy reader did not open');
+    check('点击简洁阅读才提取正文，阅读控件启用而选区禁用',await sh("return sh.querySelector('.ezr-btn-pick').disabled && [...sh.querySelectorAll('.ezr-zoom button,.ezr-font-select,.ezr-toggle-caps,.ezr-btn-outline,.ezr-btn-settings')].every(el=>!el.disabled);"));
+    await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:true})");
+    check('重复打开工具栏保持当前阅读视图且不重复挂载',await sh("return !sh.host.hasAttribute('data-ezr-original') && document.querySelectorAll('#ezr-root').length===1 && sh.querySelectorAll('.ezr-toolbar').length===1;"));
+    await sh("sh.querySelector('.ezr-btn-pick').click();");
+    await session.send('Input.dispatchKeyEvent',{type:'keyDown',key:'S',code:'KeyS',modifiers:9},page.sessionId);
+    check('阅读模式的按钮、快捷键和消息均不能绕过选区限制',!(await iso("window.__ezrSend({type:'ezr:status'})")).picking && (await iso("window.__ezrSend({type:'ezr:pick'})")).reason==='wrong-view');
+    await session.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27},page.sessionId);
+    check('Esc 从阅读返回原网页，工具栏继续保留',await sh("return sh.host.hasAttribute('data-ezr-original') && !sh.querySelector('.ezr-btn-pick').disabled;"));
+    await sh("sh.querySelector('.ezr-btn-original').click();");
+    await page.evaluate("history.pushState({},'', '?toolbar-spa')");
+    await until(()=>sh("return sh.host.hasAttribute('data-ezr-original') && sh.querySelector('.ezr-article').children.length===0;"),'SPA navigation retained stale reading view');
+    check('单页应用切换地址后工具栏仍在，旧阅读内容不覆盖新网页',true);
+    await page.evaluate(`const a=document.createElement('a');a.href=${JSON.stringify(base+'/divsoup.html')};a.id='ezr-test-navigation';document.body.appendChild(a);a.click();`);
+    await until(()=>page.evaluate("location.pathname.endsWith('/divsoup.html')"),'Link navigation failed');
+    world=await page.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});
+    await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Toolbar did not survive navigation');
+    check('点击链接换页后工具栏自动出现，无需再次开启',await sh("return sh.host.hasAttribute('data-ezr-original') && sh.querySelector('.ezr-article').children.length===0;"));
+    await page.goto(base+'/divsoup.html');world=await page.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});
+    await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Toolbar did not survive reload');
+    check('刷新页面后仍保留当前窗口的开启状态',true);
+    sibling=await CdpPage.attach(session,{url:base+'/paper.html?toolbar-tab'});
+    const sib=await reconnect(sibling);
+    await until(()=>sibling.evaluate("!!document.getElementById('ezr-root')"),'Toolbar absent from sibling tab');
+    check('同窗口新标签页自动显示工具栏',await sib("chrome.runtime.sendMessage({type:'ezr:window-toolbar:get'}).then(state=>state.enabled)"));
+    options=await CdpPage.attach(session,{url:`chrome-extension://${extensionId}/pages/options.html`});
+    await until(()=>options.evaluate("typeof chrome?.windows?.create==='function'"),'Extension window API missing');
+    const createdWindow=await options.evaluate(`chrome.windows.create({url:${JSON.stringify(base+'/paper.html?toolbar-window')},focused:false})`);
+    otherWindow=createdWindow.id;
+    const {targetInfos}=await session.send('Target.getTargets');
+    const target=targetInfos.find(item=>item.url===base+'/paper.html?toolbar-window');
+    other=await CdpPage.attach(session,{targetId:target.targetId});await reconnect(other);await pause(250);
+    check('其他浏览器窗口不自动开启工具栏',!await other.evaluate("!!document.getElementById('ezr-root')"));
+    const siblingId=await options.evaluate(`chrome.tabs.query({url:${JSON.stringify(base+'/paper.html?toolbar-tab')}}).then(tabs=>tabs[0].id)`);
+    await options.evaluate(`chrome.tabs.move(${siblingId},{windowId:${otherWindow},index:-1})`);
+    await until(()=>sibling.evaluate("!document.getElementById('ezr-root')"),'Moved tab retained old window state');
+    check('标签页移到未开启的窗口后移除工具栏',true);
+    const state=await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:get'})");
+    await options.evaluate(`chrome.tabs.move(${siblingId},{windowId:${state.windowId},index:-1})`);
+    await until(()=>sibling.evaluate("!!document.getElementById('ezr-root')"),'Moved tab did not adopt enabled window');
+    check('移回已开启的窗口后恢复工具栏',true);
+    await sh("sh.querySelector('.ezr-btn-close').click();");
+    await until(()=>sibling.evaluate("!document.getElementById('ezr-root')"),'Closing toolbar did not close sibling');
+    check('关闭工具栏会同时关闭当前窗口其他标签页中的工具栏',!await page.evaluate("!!document.getElementById('ezr-root')"));
+    await page.goto(base+'/paper.html?toolbar-closed');world=await page.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});await pause(300);
+    check('主动关闭后再换页不会自动重开',!await page.evaluate("!!document.getElementById('ezr-root')"));
+  } finally {
+    if(savedTranslation)await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:${JSON.stringify(savedTranslation)}})`).catch(()=>{});
+    await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:false})").catch(()=>{});
+    if(otherWindow&&options)await options.evaluate(`chrome.windows.remove(${otherWindow})`).catch(()=>{});
+    await sibling?.close();await popup?.close();await options?.close();
+  }
+}

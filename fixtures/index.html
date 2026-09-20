@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EZ-Reader test fixtures</title>
+<meta name="ezr-fixture" content="index">
+<meta name="description" content="Index of the offline EZ-Reader acceptance-test fixtures, with the main region id of each one.">
+<style>
+  :root { color-scheme: light; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #f4f3ef;
+    color: #1b1a18;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.55;
+  }
+  a { color: #14498c; }
+  .masthead { background: #ffffff; border-bottom: 1px solid #ddd9cd; }
+  .masthead-inner { max-width: 56rem; margin: 0 auto; padding: 14px 20px; }
+  .pub-name { font-size: 20px; font-weight: 700; letter-spacing: 0.01em; }
+  .pub-tag { font-size: 13px; color: #6b665c; margin-top: 2px; }
+  nav.site-nav { background: #fbfaf7; border-bottom: 1px solid #ebe7dd; font-size: 13px; }
+  nav.site-nav ul { list-style: none; max-width: 56rem; margin: 0 auto; padding: 8px 20px; }
+  nav.site-nav li { display: inline-block; margin-right: 16px; }
+  nav.site-nav a { text-decoration: none; color: #302e29; }
+  main { max-width: 56rem; margin: 0 auto; padding: 24px 20px 60px; }
+  #article { background: #ffffff; border: 1px solid #e5e1d6; padding: 28px 32px 36px; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 10px; }
+  h2 { font-size: 18px; margin: 28px 0 10px; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 15px; color: #3b3934; }
+  .note { font-size: 13px; color: #5d594f; background: #faf9f4; border-left: 3px solid #d9d4c6; padding: 10px 14px; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 18px; }
+  caption { caption-side: top; text-align: left; font-size: 13px; color: #6b665c; padding-bottom: 6px; }
+  th, td { border: 1px solid #e0dcd1; padding: 8px 10px; text-align: left; vertical-align: top; }
+  thead th { background: #f3f1ea; }
+  td code { font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace; font-size: 13px; background: #f4f3ef; padding: 1px 4px; }
+  ul.fixtures { list-style: none; margin: 0; padding: 0; }
+  ul.fixtures > li { border-top: 1px solid #ece8de; padding: 12px 0; }
+  ul.fixtures > li:first-child { border-top: 0; }
+  .fx-name { font-weight: 700; font-size: 15px; }
+  .fx-name a { text-decoration: none; }
+  .fx-region { font-size: 13px; color: #6b665c; margin-top: 2px; }
+  .fx-desc { font-size: 14px; margin-top: 4px; }
+  footer.site-footer { background: #ffffff; border-top: 1px solid #ddd9cd; font-size: 13px; }
+  .footer-inner { max-width: 56rem; margin: 0 auto; padding: 20px 20px 40px; }
+  .footer-col { display: inline-block; vertical-align: top; width: 31%; margin-right: 2%; }
+  .footer-col .col-head { font-weight: 700; margin-bottom: 6px; }
+  .footer-col a { display: block; padding: 2px 0; }
+  .share-row, .comment-row { margin-top: 14px; }
+  .share-row a, .comment-row a { display: inline-block; margin-right: 12px; }
+</style>
+</head>
+<body data-ezr-fixture="index">
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="pub-name">EZ-Reader &middot; offline test fixtures</div>
+    <div class="pub-tag">Seven static documents, no network, no timers, no scripts that mutate anything</div>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Fixture index navigation">
+  <ul>
+    <li><a href="#article">Index</a></li>
+    <li><a href="paper.html">paper.html</a></li>
+    <li><a href="divsoup.html">divsoup.html</a></li>
+    <li><a href="rich.html">rich.html</a></li>
+    <li><a href="long.html">long.html</a></li>
+    <li><a href="lazy-iframe.html">lazy-iframe.html</a></li>
+    <li><a href="cjk.html">cjk.html</a></li>
+  </ul>
+</nav>
+
+<main>
+<div id="article">
+
+  <h1>EZ-Reader test fixtures</h1>
+
+  <p class="lede">These fixtures are served from the local fixture root and loaded by the headless acceptance suite as <code>/fixtures/&lt;name&gt;.html</code>. Every page is a complete, self-contained HTML5 document that renders with zero network access: system font stacks only, no external stylesheets, no external scripts, no images loaded over the network, and no fonts downloaded at runtime. Nothing on any page mutates the DOM on its own, so serialising <code>document.documentElement.outerHTML</code> before and after activating the reader must produce a byte-identical result.</p>
+
+  <div class="note">Main region ids are stable and deliberately memorable: <code>#article</code> for the article-shaped fixtures and <code>#content</code> for the div-soup fixture. Each page also carries <code>&lt;meta name="ezr-fixture" content="&lt;name&gt;"&gt;</code> in the head and a matching <code>data-ezr-fixture</code> attribute on the body.</div>
+
+  <h2>Fixtures</h2>
+
+  <table>
+    <caption>Fixture, main region id, and the behaviour each one exists to exercise.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Fixture</th>
+        <th scope="col">Main region</th>
+        <th scope="col">What it tests</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><a href="paper.html">paper.html</a></td><td><code>#article</code></td><td>Semantic academic structure: h1 title, six h2 sections, nested h3 and h4, 20 dense paragraphs of 60&ndash;140 words, a blockquote, a <code>pre/code</code> block, and a figure with a caption but no image file.</td></tr>
+      <tr><td><a href="divsoup.html">divsoup.html</a></td><td><code>#content</code></td><td>Div soup with no heading tags at all: levels come only from 30px / 21px / 17px font sizes, body text is 16px at line-height 1.35 with a 4px paragraph gap, and short byline and date divs must not be promoted.</td></tr>
+      <tr><td><a href="rich.html">rich.html</a></td><td><code>#article</code></td><td>Inline formatting and exclusion: every whitelisted inline element, links, a bare URL, an e-mail address, lists, a 4-column table, a data-URI image, a script that must be stripped, malicious links that must degrade to text, and hidden text that must be dropped.</td></tr>
+      <tr><td><a href="long.html">long.html</a></td><td><code>#article</code></td><td>Performance: exactly 5000 static paragraph-level blocks (4950 paragraphs and 50 headings, one heading every 100th block) with no runtime generation, no timers, and no external resources.</td></tr>
+      <tr><td><a href="lazy-iframe.html">lazy-iframe.html</a></td><td><code>#article</code></td><td>Robustness: an <code>srcdoc</code> iframe, a fixed bottom bar, <code>overflow: hidden</code> on html and body with a scrollable inner wrapper that must be restored on exit, and collapsed <code>details</code> content that must not be extracted.</td></tr>
+      <tr><td><a href="cjk.html">cjk.html</a></td><td><code>#article</code></td><td>Chinese content: one h1, three h2 sections and ten paragraphs of Chinese prose, with exactly one embedded English sentence so mixed-content handling and the CJK-dominance warning can be asserted.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Per-fixture notes</h2>
+
+  <ul class="fixtures">
+    <li>
+      <div class="fx-name"><a href="paper.html">paper.html</a></div>
+      <div class="fx-region">main region: <code>id="article"</code></div>
+      <div class="fx-desc">Use this fixture for heading-level assignment, paragraph rhythm, and noise rejection around a long academic article. The chrome regions sit outside the article: a masthead, a site nav, and a three-column footer of related articles, sharing links, and comments.</div>
+    </li>
+    <li>
+      <div class="fx-name"><a href="divsoup.html">divsoup.html</a></div>
+      <div class="fx-region">main region: <code>id="content"</code></div>
+      <div class="fx-desc">The hard case. Inside <code>#content</code> there are no semantic tags and no class or id names containing navigation, menu, comment, footer, share, related, promo, advert, cookie, banner, toolbar, sidebar, or breadcrumb hints, so the noise filter has nothing to latch onto inside the article. Those words appear only on the genuine chrome: the masthead, the toolbar strip, the main menu, the breadcrumb, the sidebar promo and advert slots, and the footer.</div>
+    </li>
+    <li>
+      <div class="fx-name"><a href="rich.html">rich.html</a></div>
+      <div class="fx-region">main region: <code>id="article"</code></div>
+      <div class="fx-desc">Keep this one for sanitizer and title-case coverage. The article contains the marker strings <code>EZR_SHOULD_BE_STRIPPED_1</code>, <code>EZR_SHOULD_BE_STRIPPED_2</code>, and <code>EZR_HIDDEN_TEXT</code>, plus casing traps such as iPhone, DNA, U.S.A., e-mail, state-of-the-art, and 2024, and two links whose destinations are scripts rather than documents.</div>
+    </li>
+    <li>
+      <div class="fx-name"><a href="long.html">long.html</a></div>
+      <div class="fx-region">main region: <code>id="article"</code></div>
+      <div class="fx-desc">A static file of roughly 1.4&nbsp;MB holding exactly 5000 paragraph-level blocks, counted by counting occurrences of the <code>ezr-block</code> class inside <code>#article</code>: 4950 paragraphs plus 50 headings. Use it to check scan time, the 20000-block ceiling, and outline construction at scale.</div>
+    </li>
+    <li>
+      <div class="fx-name"><a href="lazy-iframe.html">lazy-iframe.html</a></div>
+      <div class="fx-region">main region: <code>id="article"</code></div>
+      <div class="fx-desc">Loads nothing from the network: the iframe carries its whole four-paragraph card in a <code>srcdoc</code> attribute. The page also sets <code>overflow: hidden</code> on both html and body and scrolls an inner wrapper instead, so the reader must record and restore the original overflow value on exit. The collapsed <code>details</code> element holds <code>EZR_COLLAPSED_TEXT</code>, which must not appear in the reading view while it is closed.</div>
+    </li>
+    <li>
+      <div class="fx-name"><a href="cjk.html">cjk.html</a></div>
+      <div class="fx-region">main region: <code>id="article"</code></div>
+      <div class="fx-desc">Ten paragraphs of Chinese prose, roughly 150 to 190 Han characters each, with one English sentence of more than fifteen words inside the sixth paragraph. Capitalising the first letter of every word must leave the Chinese text untouched, and the CJK-dominance warning is expected to fire on this page.</div>
+    </li>
+  </ul>
+
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-col">
+      <div class="col-head">Related pages</div>
+      <a href="paper.html">Academic paper fixture</a>
+      <a href="rich.html">Inline formatting fixture</a>
+      <a href="cjk.html">Chinese prose fixture</a>
+    </div>
+    <div class="footer-col">
+      <div class="col-head">Share</div>
+      <a href="#article">Share the fixture set</a>
+      <a href="#article">Share by e-mail</a>
+      <a href="#article">Copy a link</a>
+    </div>
+    <div class="footer-col">
+      <div class="col-head">Comments</div>
+      <a href="#article">Discuss the fixtures</a>
+      <a href="#article">Report a broken fixture</a>
+      <a href="#article">Contributor notes</a>
+    </div>
+    <div class="share-row">Share: <a href="#article">Twitter</a><a href="#article">Mastodon</a><a href="#article">LinkedIn</a></div>
+    <div class="comment-row">Comments on the fixture set: <a href="#article">read the thread</a> &middot; <a href="#article">subscribe</a></div>
+  </div>
+</footer>
+
+</body>
+</html>

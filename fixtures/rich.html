@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Notes from the 2024 Typography Audit &mdash; Paragraph Review</title>
+<meta name="ezr-fixture" content="rich">
+<meta name="description" content="Inline formatting and exclusion coverage: every whitelisted inline element, tables, lists, code, a data-URI image, a script that must be stripped and hidden text that must be dropped.">
+<style>
+  :root { color-scheme: light; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #f7f6f2;
+    color: #1a1a1a;
+    font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    line-height: 1.6;
+  }
+  a { color: #14508c; }
+  .masthead { background: #ffffff; border-bottom: 1px solid #ddd8cc; }
+  .masthead-inner { max-width: 54rem; margin: 0 auto; padding: 14px 20px; }
+  .pub-name { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 19px; font-weight: 700; }
+  .pub-tag { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; color: #6b6558; }
+  nav.top-nav { background: #fbfaf6; border-bottom: 1px solid #ebe7dd; font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; }
+  nav.top-nav ul { list-style: none; max-width: 54rem; margin: 0 auto; padding: 8px 20px; }
+  nav.top-nav li { display: inline-block; margin-right: 15px; }
+  nav.top-nav a { text-decoration: none; color: #2b2925; }
+  main { max-width: 54rem; margin: 0 auto; padding: 24px 20px 60px; }
+  article#article { background: #ffffff; border: 1px solid #e4e0d6; padding: 30px 36px 40px; }
+  h1 { font-size: 28px; line-height: 1.25; margin: 0 0 12px; }
+  h2 { font-size: 20px; margin: 30px 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 8px; }
+  p { margin: 0 0 15px; }
+  .byline { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; color: #5f5a50; margin-bottom: 20px; }
+  mark { background: #fdf1a8; }
+  u { text-decoration: underline; }
+  s { color: #7a746a; }
+  abbr[title] { border-bottom: 1px dotted #8a8478; cursor: help; }
+  kbd {
+    font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+    font-size: 12px;
+    background: #f2f0ea;
+    border: 1px solid #d6d1c4;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  samp { font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace; font-size: 13px; color: #3c3a34; }
+  var { font-style: italic; color: #4a463d; }
+  code { font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace; font-size: 0.93em; background: #f4f2ec; padding: 1px 4px; }
+  pre { background: #f6f4ee; border: 1px solid #e0dcd0; padding: 12px 14px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: 13px; line-height: 1.5; }
+  ul, ol { margin: 0 0 16px; padding-left: 26px; }
+  li { margin-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 18px; font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; }
+  caption { caption-side: top; text-align: left; font-size: 13px; color: #5f5a50; padding-bottom: 6px; }
+  th, td { border: 1px solid #ddd8cc; padding: 7px 9px; text-align: left; vertical-align: top; }
+  thead th { background: #f1efe8; }
+  figure { margin: 22px 0; }
+  figure img { border: 1px solid #e0dcd0; }
+  figcaption { font-size: 13px; color: #5f5a50; margin-top: 8px; line-height: 1.45; }
+  footer.site-footer { background: #ffffff; border-top: 1px solid #ddd8cc; font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-size: 13px; }
+  .footer-inner { max-width: 54rem; margin: 0 auto; padding: 20px 20px 40px; }
+  .footer-col { display: inline-block; vertical-align: top; width: 31%; margin-right: 2%; }
+  .footer-col .col-head { font-weight: 700; margin-bottom: 6px; }
+  .footer-col a { display: block; padding: 2px 0; }
+  .share-row, .comment-row { margin-top: 14px; }
+  .share-row a, .comment-row a { margin-right: 12px; display: inline-block; }
+</style>
+</head>
+<body data-ezr-fixture="rich">
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="pub-name">Paragraph Review</div>
+    <div class="pub-tag">A working notebook on text, layout, and the people who read both</div>
+  </div>
+</header>
+
+<nav class="top-nav" aria-label="Section navigation">
+  <ul>
+    <li><a href="#article">Latest</a></li>
+    <li><a href="#article">Typography</a></li>
+    <li><a href="#article">Tooling</a></li>
+    <li><a href="#article">Notebook</a></li>
+    <li><a href="#article">About the editors</a></li>
+    <li><a href="#article">Write for us</a></li>
+  </ul>
+</nav>
+
+<main>
+<article id="article">
+
+  <h1>Field Notes from the 2024 Typography Audit</h1>
+  <div class="byline">By the editors &middot; 18 September 2024 &middot; 12 minute read &middot; <a href="https://example.com/editors/typography-desk">Typography desk</a></div>
+
+  <p>Every year we take a sample of the pages our readers send us and look at how the text is actually set, rather than how the style guide says it should be set. The <strong>2024 audit</strong> covered <mark>two hundred and six articles</mark> from ninety-one publications, and the headline finding is unchanged from last year: the average body paragraph is set <em>tighter</em> than it was a decade ago, even though the screens displaying it are larger and sharper than they have ever been. The distance between the two trends is where the trouble lives.</p>
+
+  <p>We begin with the instrument rather than the verdict. Measurements were taken from the rendered page at a viewport of <code>1280 &times; 800</code> CSS pixels, with the browser's default font size left untouched at 16&nbsp;px. For each article we recorded the computed <var>lineHeight</var>, the vertical gap between adjacent paragraphs, and the measure in characters, and we discarded any page whose body text could not be identified unambiguously. If you want to repeat the exercise, press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>I</kbd> and inspect a paragraph; the values we care about are all in the computed style panel, and no tooling beyond the browser is required.</p>
+
+  <h2>What the numbers looked like</h2>
+
+  <p>The median line height across the sample was <strong>1.36</strong>, down from 1.42 in 2019 and 1.51 in 2014. The median paragraph gap was four pixels, which is to say that a new paragraph began roughly a quarter of a line below the previous one. Only <u>eleven percent</u> of articles used a gap of a full line or more, and those were overwhelmingly the work of publications with a print heritage or a dedicated design team. The remaining pages were set to what is effectively a single continuous block, punctuated by headings that appear every thousand words or so and therefore do very little to break the text into units a reader can hold in mind.</p>
+
+  <p>Measure behaved differently. The median line ran to ninety-two characters, but the distribution had a long tail in both directions: a cluster of well-set pages at sixty-five to seventy-five characters, a large mass between eighty-five and a hundred, and a small group of full-width pages above a hundred and twenty. Anything past about ninety characters becomes difficult to track without a deliberate effort, and past a hundred and ten the return sweep starts to fail often enough that readers lose their place several times per paragraph. This is not a subtle effect; it is the difference between reading and re-reading.</p>
+
+  <div style="display:none">EZR_HIDDEN_TEXT</div>
+
+  <h3>Three settings, one page</h3>
+
+  <p>The audit also looked at whether the three variables move together. They do not. Publications that set a generous line height were only slightly more likely to set a generous paragraph gap, and measure appeared to be chosen independently of both, usually as a consequence of a grid or a fixed container width. That independence matters for anyone building a reading tool, because it means the defects do not cancel out. A page can be excellent on two of the three measures and still be exhausting to read because of the third, and the fix has to be applied per property rather than as a single house style.</p>
+
+  <p>Consider the following sample of pages from the audit, all of which look broadly similar at a glance:</p>
+
+  <table>
+    <caption>Table 1. Three audited pages, measured at a 1280 &times; 800 viewport.</caption>
+    <thead>
+      <tr>
+        <th scope="col">Publication</th>
+        <th scope="col">Line height</th>
+        <th scope="col">Paragraph gap</th>
+        <th scope="col">Measure (characters)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Harrow Bay Review</td><td>1.62</td><td>18 px</td><td>68</td></tr>
+      <tr><td>Northgate Bulletin</td><td>1.38</td><td>4 px</td><td>94</td></tr>
+      <tr><td>Coastal Technical Press</td><td>1.55</td><td>0 px (indent only)</td><td>72</td></tr>
+      <tr><td>Metro Desk Daily</td><td>1.30</td><td>2 px</td><td>118</td></tr>
+      <tr><td>Quarterly Field Notes</td><td>1.48</td><td>12 px</td><td>81</td></tr>
+    </tbody>
+  </table>
+
+  <p>The third row is instructive. Coastal Technical Press uses no paragraph gap at all, which sounds like the worst possible choice, but it sets a first-line indent of two <code>em</code> and keeps the measure at seventy-two characters, so the paragraph boundary is visible and the line is short enough to track. Metro Desk Daily, by contrast, has a small gap and a small line height and a measure of a hundred and eighteen characters, which is the combination that produces the complaints we receive most often: readers describe the page as <samp>a wall</samp> and report that they lose their place on nearly every line.</p>
+
+  <h2>What readers told us</h2>
+
+  <p>Alongside the measurements we ran a short questionnaire, and the free-text answers were more useful than the ratings. Readers used three phrases repeatedly: <em>losing my place</em>, <em>the paragraphs run together</em>, and <em>I gave up after a screen or two</em>. Only a handful mentioned font choice, and nobody at all mentioned colour, which is a useful corrective to the amount of attention those two decisions receive in design reviews. Spacing is invisible to readers in the sense that they cannot name it, but they feel its absence immediately, and they attribute the resulting fatigue to the writing rather than to the layout.</p>
+
+  <p>One participant, a solicitor who reads contracts for a living, described a technique that we have since adopted in our own reading: forcing a paragraph gap of one full line before starting a long document, then reducing the browser zoom slightly so that the measure falls inside eighty characters. The combination, they said, turned a forty-minute reading task into a twenty-five minute one, and they were careful to add that nothing about the document itself had changed. The words were identical. What changed was the amount of work required to move through them.</p>
+
+  <h3>The inline markup problem</h3>
+
+  <p>Formatting inside the paragraph deserves its own note, because it is where good intentions most often go wrong. Emphasis should mark the few phrases that would change a reader's decision if they were missed, and it should be used sparingly enough that the marks retain their force. A page that bolds every second clause, underlines a term that is also italicised, and marks three competing definitions in yellow is not emphasising anything; it is transferring the job of deciding what matters back to the reader, who has less context than the author and no way to recover it.</p>
+
+  <p>Two practical rules follow. First, choose one mark per purpose: bold for a conclusion, italic for a term at its point of definition, and nothing else. Second, remember that some inline elements exist to carry meaning rather than appearance. An <abbr title="Application Programming Interface">API</abbr> reference, a <abbr title="United States of America">U.S.A.</abbr> dateline, and a chemical formula such as H<sub>2</sub>O or a footnote marker<sup>1</sup> all carry structure that must survive any conversion to a cleaner reading view. Strip the tags and the meaning goes with them.</p>
+
+  <p>Three conventions are worth keeping even though they look redundant beside their semantic cousins. Bold without emphasis is the right mark for an interface label that a reader has to find on screen, as in press <b>Compute</b> to run the check. Italics without emphasis is the right mark for a title or a term in another language, as in the <i>Journal of Applied Reading Systems</i>, where the slant carries no stress at all. A struck-through phrase, as in the earlier guidance that set <s>ninety characters</s> as an acceptable maximum, records a correction without deleting the history, and it should never be used for guidance that is still in force.</p>
+
+  <p>Technical writing adds a further layer. Code spans, keyboard shortcuts, and sample output are not decoration: they are the payload of the sentence, and a reader who cannot distinguish <code>bodyFontSize</code> the property from <samp>16px</samp> the reported value will misread the instruction. The convention we recommend, and the one used throughout this piece, is to keep inline code visually quiet, to reserve <kbd>keyboard</kbd> styling for keys the reader actually presses, and to avoid italics for anything that a reader might need to type exactly as written.</p>
+
+  <ol>
+    <li>Set the body line height to at least 1.5 before choosing anything else.</li>
+    <li>Give every paragraph a gap of at least one line, or use a clear first-line indent instead.</li>
+    <li>Keep the measure between sixty and eighty characters at the default font size.</li>
+    <li>Use one inline mark per purpose, and let the other marks go.</li>
+  </ol>
+
+  <p>The audit's closing recommendation is the same as last year's, and we make no apology for repeating it. The cheapest improvement available to almost any publication is to add vertical space, and the reason it is not done is not cost but attention: spacing lives in a stylesheet that nobody reads, controlled by a default that nobody chose, and its effects show up as reader fatigue rather than as a bug. Fixing it takes an afternoon. Not fixing it costs a fraction of every reader's attention, every time the page is opened.</p>
+
+  <ul>
+    <li>Line height: target 1.6, accept 1.5, investigate anything below 1.4.</li>
+    <li>Paragraph gap: at least one line, and visibly larger than the leading inside a paragraph.</li>
+    <li>Measure: sixty to eighty characters, and never above ninety on a laptop screen.</li>
+    <li>Alignment: ragged right, unless hyphenation and justification are both under control.</li>
+    <li>Inline marks: one per purpose, applied fewer than a dozen times in a long article.</li>
+  </ul>
+
+  <h3>Reproducing the measurement</h3>
+
+  <p>The script below is the one we used, trimmed to the parts that matter. It runs in the browser console on any article page, walks the paragraphs of the largest content region, and prints a compact summary. Nothing is uploaded and nothing is stored; the whole exercise is local, which is the only way we could persuade some of the publications in the sample to take part at all.</p>
+
+  <pre><code>// Report computed typography for the densest content region on the page.
+const blocks = [...document.querySelectorAll('p')].filter(
+  (el) =&gt; el.textContent.trim().split(/\s+/).length &gt; 20,
+);
+
+const rows = blocks.map((el) =&gt; {
+  const cs = getComputedStyle(el);
+  return {
+    fontSize: parseFloat(cs.fontSize),
+    lineHeight: parseFloat(cs.lineHeight),
+    gapPx: parseFloat(cs.marginBottom) + parseFloat(cs.marginTop),
+    chars: Math.round(el.getBoundingClientRect().width / (parseFloat(cs.fontSize) * 0.5)),
+  };
+});
+
+const median = (xs) =&gt; {
+  const s = [...xs].sort((a, b) =&gt; a - b);
+  const m = s.length &gt;&gt; 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+console.log({
+  paragraphs: rows.length,
+  lineHeight: median(rows.map((r) =&gt; r.lineHeight / r.fontSize)),
+  gapPx: median(rows.map((r) =&gt; r.gapPx)),
+  measure: median(rows.map((r) =&gt; r.chars)),
+});</code></pre>
+
+  <p>Two caveats belong with the script. The measure estimate assumes an average advance width of half the font size, which is close enough for Latin text and wrong for anything else, so treat the character count as a signal rather than a measurement. And the filter that keeps only paragraphs longer than twenty words will drop short captions and pull quotes, which is deliberate: they are set differently on purpose, and including them would drag the medians toward values that describe nothing a reader actually reads for any length of time.</p>
+
+  <h3>A note on device-specific text</h3>
+
+  <p>Product names and initialisms are where automatic tidying does the most damage. Our own reading tool offers a setting that capitalises the first letter of every word, which is useful for headings and actively harmful for anything with meaningful internal casing. Consider a sentence that mentions <strong>iPhone</strong>, <strong>DNA</strong>, <strong>e-mail</strong>, <strong>state-of-the-art</strong>, and the year <strong>2024</strong>. A careless implementation returns IPhone, Dna, E-Mail, State-Of-The-Art, and 2024 changed only by luck. Readers in the U.S.A. notice the damage immediately, because iPhone and DNA are written the way their owners write them, state-of-the-art loses its hyphens in some engines, and e-mail is not the same word as Email or E-Mail. The rule we follow is to capitalise the first character of a word and leave every other character exactly as the author typed it, and to skip pure numbers, URLs, and e-mail addresses entirely.</p>
+
+  <p>Links need the same care. A hyperlink that points to a real document should survive extraction as a link, with its destination preserved, while a link whose destination is a script rather than a document must degrade to plain text rather than being rendered as something a reader might click. We keep two deliberately broken examples in this paragraph for testing purposes: <a href="javascript:alert(1)">bad link</a> and <a href="  JavaScript:alert(2)">Bad Link 2</a>. Neither should appear as a working link in a clean reading view, and neither should be dropped so aggressively that the surrounding sentence loses its meaning.</p>
+
+  <p>Finally, contact details and long identifiers. A reader who wants to follow up should be able to copy the address without retyping it, and an address that has been auto-linked into a clickable element may behave differently depending on the mail client involved. Our preference is to leave both as plain text: write the address as letters@example.com and the canonical reference as https://example.com/typography-audit-2024, and let the reader decide what to do with them. The visual noise of a coloured link is rarely worth the loss of predictability.</p>
+
+  <figure>
+    <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='320'%20height='120'%20viewBox='0%200%20320%20120'%3E%3Crect%20width='320'%20height='120'%20fill='%23f2f0ea'/%3E%3Crect%20x='20'%20y='20'%20width='280'%20height='8'%20fill='%23c9c3b4'/%3E%3Crect%20x='20'%20y='40'%20width='280'%20height='8'%20fill='%23c9c3b4'/%3E%3Crect%20x='20'%20y='60'%20width='280'%20height='8'%20fill='%23c9c3b4'/%3E%3Crect%20x='20'%20y='88'%20width='140'%20height='8'%20fill='%2314508c'/%3E%3C/svg%3E" alt="Diagram: four rules of text with one highlighted, illustrating a paragraph boundary." width="320" height="120">
+    <figcaption><strong>Figure 1.</strong> The three grey rules represent lines inside a paragraph; the blue rule marks the first line of the next paragraph. When the gap between them is smaller than the leading inside a paragraph, the boundary disappears and the reader must infer it from the writing.</figcaption>
+  </figure>
+
+  <script>
+    /* EZR_SHOULD_BE_STRIPPED_2 — this comment and the code below must never reach the reading view. */
+    (function () {
+      var EZR_SHOULD_BE_STRIPPED_1 = 'EZR_SHOULD_BE_STRIPPED_1';
+      void EZR_SHOULD_BE_STRIPPED_1;
+    })();
+  </script>
+
+</article>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-col">
+      <div class="col-head">Related articles</div>
+      <a href="#article">Why ninety characters is too many</a>
+      <a href="#article">The paragraph gap, measured across 200 sites</a>
+      <a href="#article">Reading on a phone without losing your place</a>
+      <a href="#article">A short defence of ragged right</a>
+    </div>
+    <div class="footer-col">
+      <div class="col-head">Share</div>
+      <a href="#article">Share on a social network</a>
+      <a href="#article">Share by e-mail</a>
+      <a href="#article">Copy a link to this article</a>
+      <a href="#article">Download the raw measurements</a>
+    </div>
+    <div class="footer-col">
+      <div class="col-head">Comments</div>
+      <a href="#article">Read 64 comments</a>
+      <a href="#article">Add your comment</a>
+      <a href="#article">Community guidelines</a>
+      <a href="#article">Report a correction</a>
+    </div>
+    <div class="share-row">Share: <a href="#article">Twitter</a><a href="#article">Mastodon</a><a href="#article">LinkedIn</a><a href="#article">E-mail</a></div>
+    <div class="comment-row">Comments are open for seven days: <a href="#article">subscribe to replies</a> &middot; <a href="#article">comment policy</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
