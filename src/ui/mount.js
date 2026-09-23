@@ -118,6 +118,7 @@ function ensureHost(doc, previous) {
  * @param {{doc?: Document, settings?: Object, onClose?: Function}} [opts] 选项。
  * @returns {{host: Element, shadow: ShadowRoot, root: HTMLElement, article: HTMLElement,
  *   toolbarHost: HTMLElement, outlineHost: HTMLElement, toastHost: HTMLElement,
+ *   setDock: (dock: unknown) => ('top'|'bottom'),
  *   onClose: (Function|undefined), destroy: () => void}} 句柄；`onClose` 为透传，便于调用方复用同一回调。
  */
 export function mount(opts = {}) {
@@ -185,6 +186,30 @@ export function mount(opts = {}) {
 
   applyVars(root, opts.settings ?? null);
 
+  /**
+   * 将工具栏移动到指定的窗口边缘。
+   * DOM 顺序与视觉顺序一致，使键盘 Tab 遍历顺序与停靠位置对应。
+   * @param {unknown} dock `'top'` 或 `'bottom'`；其它值按 `'top'` 处理。
+   * @returns {'top'|'bottom'} 实际生效的停靠边。
+   */
+  const setDock = (dock) => {
+    const side = dock === 'bottom' ? 'bottom' : 'top';
+    try {
+      if (side === 'bottom') root.insertBefore(toolbarHost, toastHost);
+      else root.insertBefore(toolbarHost, body);
+    } catch {
+      /* 宿主结构异常时保持当前顺序 */
+    }
+    try {
+      host.setAttribute('data-ezr-dock', side);
+    } catch {
+      /* 忽略 */
+    }
+    return side;
+  };
+
+  setDock(opts.settings ? opts.settings.toolbarDock : 'top');
+
   const controller = new AbortController();
   let destroyed = false;
 
@@ -220,6 +245,7 @@ export function mount(opts = {}) {
     toolbarHost,
     outlineHost,
     toastHost,
+    setDock,
     signal: controller.signal,
     onClose: opts.onClose,
     destroy,

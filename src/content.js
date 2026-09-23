@@ -146,6 +146,23 @@ function bootstrap() {
       return next;
     },
 
+    /**
+     * 保存工具栏停靠边。
+     *
+     * 停靠边属于工具栏自身属性，而非网站显示偏好，故固定写入共享默认值，
+     * 对所有站点生效，不受 `rememberPerSite` 影响。
+     * @param {'top'|'bottom'} dock 目标停靠边。
+     * @returns {Promise<Record<string, unknown>>} 更新后的生效设置。
+     */
+    async setToolbarDock(dock) {
+      const next = normalizeSettings({ ...this.resolved, toolbarDock: dock });
+      this.resolved = next;
+      this.defaults = normalizeSettings({ ...this.defaults, toolbarDock: next.toolbarDock });
+      if (session) session.applySettings(next);
+      await storage.write(storageKeyFor('', 'settings'), this.defaults);
+      return next;
+    },
+
     async reset() {
       this.defaults = { ...DEFAULT_SETTINGS };
       this.byOrigin = { ...this.byOrigin, [origin]: {} };
@@ -314,6 +331,7 @@ function bootstrap() {
       },
       onClose: () => closeWindowTools(),
       onFontQuick: (fontId) => settingsStore.update({ fontId }),
+      onToggleDock: (dock) => { void settingsStore.setToolbarDock(dock); },
     });
 
     function paint(nextDoc, nextSettings) {
@@ -448,6 +466,7 @@ function bootstrap() {
       /** @param {object} nextSettings */
       applySettings(nextSettings) {
         applyVars(shell.root, nextSettings);
+        shell.setDock(nextSettings.toolbarDock);
         // applyVars seeds automatic zoom at 1. Preserve the measured scale while
         // recalculating: the watcher suppresses callbacks for unchanged results.
         shell.root.style.setProperty('--ezr-scale', String(zoomState.scale));

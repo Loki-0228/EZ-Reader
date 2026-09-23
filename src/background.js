@@ -58,9 +58,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   // 缩放
   zoomMode: 'fit-width',
   zoom: 1,
-  // 外观
+  // 外观设置
   theme: 'light',
   showOutline: false,
+  toolbarDock: 'top',
   // 行为
   rememberPerSite: true,
   restorePosition: true,

@@ -28,6 +28,7 @@ const ENUM_FIELDS = Object.freeze({
   headingMode: Object.freeze(['conservative', 'standard', 'aggressive']),
   zoomMode: Object.freeze(['fit-width', 'fit-page', 'manual']),
   theme: Object.freeze(['light', 'sepia', 'dark', 'auto']),
+  toolbarDock: Object.freeze(['top', 'bottom']),
 });
 
 /** CJK ideographs, kana, hangul and CJK punctuation. @type {RegExp} */

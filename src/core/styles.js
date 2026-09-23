@@ -109,6 +109,19 @@ export function readerCss() {
 }
 :host([data-ezr-original]) .ezr-body { display: none; }
 
+/* Bottom dock: the toolbar sits flush with the viewport bottom, so its border and shadow are inverted. */
+:host([data-ezr-dock="bottom"]) .ezr-toolbar-host {
+  box-shadow: 0 -4px 14px rgba(0,0,0,.18), 0 -1px 3px rgba(0,0,0,.12);
+}
+:host([data-ezr-dock="bottom"]) .ezr-toolbar {
+  border-bottom: 0;
+  border-top: 2px solid color-mix(in srgb, var(--ezr-fg) 24%, var(--ezr-bg));
+}
+:host([data-ezr-original][data-ezr-dock="bottom"]) { top: auto !important; bottom: 0 !important; }
+:host([data-ezr-original][data-ezr-dock="bottom"]) .ezr-root {
+  box-shadow: 0 -6px 20px rgba(0,0,0,.2), 0 -1px 4px rgba(0,0,0,.14);
+}
+
 .ezr-root *,
 .ezr-root *::before,
 .ezr-root *::after { box-sizing: border-box; }

@@ -35,6 +35,16 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     check('打开工具栏默认保留原网页，不自动提取或翻译',await sh("return sh.host.hasAttribute('data-ezr-original') && sh.querySelector('.ezr-article').children.length===0 && sh.querySelector('.ezr-full-bar').hidden;"));
     check('原网页可用选区、大写和通用设置，排版控件置灰并说明原因',await sh("return !sh.querySelector('.ezr-btn-pick').disabled && !sh.querySelector('.ezr-toggle-caps').disabled && [...sh.querySelectorAll('.ezr-zoom button,.ezr-font-select,.ezr-btn-outline')].every(el=>el.disabled&&el.title.includes('简洁阅读')) && !sh.querySelector('.ezr-btn-settings').disabled && !sh.querySelector('.ezr-btn-translation').disabled;"));
     check('简洁阅读和选择区域组成紧邻的左右两段按钮',await sh("const left=sh.querySelector('.ezr-btn-original'),right=sh.querySelector('.ezr-btn-pick'),a=left.getBoundingClientRect(),b=right.getBoundingClientRect();return left.parentElement===right.parentElement && left.parentElement.getAttribute('role')==='group' && Math.abs(a.right-b.left)<1 && a.top===b.top;"));
+    check('工具栏最右侧是停靠切换按钮，默认停靠窗口顶部',await sh("const bar=sh.querySelector('.ezr-toolbar'),btn=sh.querySelector('.ezr-btn-dock'),r=btn.getBoundingClientRect();return bar.lastElementChild===btn && sh.host.getAttribute('data-ezr-dock')==='top' && btn.getAttribute('aria-pressed')==='false' && r.top<innerHeight/2;"));
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock toggle did not move the toolbar to the bottom');
+    check('切到下边栏后工具栏贴住窗口底部，原网页顶部不再被遮挡',await sh("const bar=sh.querySelector('.ezr-toolbar'),r=bar.getBoundingClientRect(),host=sh.host.getBoundingClientRect();return Math.abs(r.bottom-innerHeight)<=1 && r.top>innerHeight/2 && host.top>innerHeight/2 && sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='true';"));
+    check('下边栏停靠时上边框出现、下边框消失，阴影翻到上侧',await sh("const bar=sh.querySelector('.ezr-toolbar'),cs=getComputedStyle(bar),host=sh.querySelector('.ezr-toolbar-host');return parseFloat(cs.borderTopWidth)>=2 && parseFloat(cs.borderBottomWidth)===0 && getComputedStyle(host).boxShadow.includes('-4px 14px');"));
+    check('切换按钮的文案与提示随停靠状态更新',await sh("const b=sh.querySelector('.ezr-btn-dock');return b.textContent.includes('顶部') && b.title.includes('顶部') && b.getAttribute('aria-label')===b.title;"));
+    check('停靠状态写入共享默认设置，不写入站点覆盖',await iso("Promise.all([chrome.storage.local.get('ezr:settings:default'),chrome.storage.local.get('ezr:settings:byOrigin')]).then(([d,o])=>{const byOrigin=o['ezr:settings:byOrigin']||{};return d['ezr:settings:default'].toolbarDock==='bottom' && Object.values(byOrigin).every(entry=>!entry||!Object.hasOwn(entry,'toolbarDock'));})"));
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='top';"),'Dock toggle did not restore the top edge');
+    check('切回顶部后工具栏回到窗口顶部且按钮不再按下',await sh("const r=sh.querySelector('.ezr-toolbar').getBoundingClientRect();return r.top<=1 && sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='false' && sh.querySelector('.ezr-btn-dock').textContent.includes('底部');"));
     await sh("sh.querySelector('.ezr-zoom-in').click();");
     check('点击置灰控件不会更改视图或设置',await sh("return sh.host.hasAttribute('data-ezr-original') && !sh.querySelector('.ezr-settings.is-open');") && (await iso("window.__ezrSend({type:'ezr:status'})")).settings.zoom===1);
     savedTranslation=(await iso("chrome.runtime.sendMessage({type:'ezr:translation:config'})")).config;
@@ -75,6 +85,9 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await sh("sh.querySelector('.ezr-btn-original').click();");
     await until(()=>sh("return !sh.host.hasAttribute('data-ezr-original') && sh.querySelectorAll('.ezr-para').length>10;"),'Lazy reader did not open');
     check('点击简洁阅读才提取正文，阅读控件启用而选区禁用',await sh("return sh.querySelector('.ezr-btn-pick').disabled && [...sh.querySelectorAll('.ezr-zoom button,.ezr-font-select,.ezr-toggle-caps,.ezr-btn-outline,.ezr-btn-settings')].every(el=>!el.disabled);"));
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock toggle failed in the reader view');
+    check('阅读视图切到下边栏后工具栏位于正文下方，正文不被压住',await sh("const bar=sh.querySelector('.ezr-toolbar').getBoundingClientRect(),body=sh.querySelector('.ezr-body').getBoundingClientRect();return Math.abs(bar.top-body.bottom)<=1 && Math.abs(bar.bottom-innerHeight)<=1 && body.height>0;"));
     await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:true})");
     check('重复打开工具栏保持当前阅读视图且不重复挂载',await sh("return !sh.host.hasAttribute('data-ezr-original') && document.querySelectorAll('#ezr-root').length===1 && sh.querySelectorAll('.ezr-toolbar').length===1;"));
     await sh("sh.querySelector('.ezr-btn-pick').click();");
@@ -94,6 +107,11 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await page.goto(base+'/divsoup.html');world=await page.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});
     await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Toolbar did not survive reload');
     check('刷新页面后仍保留当前窗口的开启状态',true);
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock state did not survive navigation');
+    check('换页与刷新后仍保持下边栏停靠',await sh("return sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='true' && sh.querySelector('.ezr-btn-dock').textContent.includes('顶部');"));
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='top';"),'Dock toggle did not restore the top edge after navigation');
+    check('换页后在原网页切回顶部停靠生效',await sh("const r=sh.querySelector('.ezr-toolbar').getBoundingClientRect();return r.top<=1 && sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='false';"));
     sibling=await CdpPage.attach(session,{url:base+'/paper.html?toolbar-tab'});
     const sib=await reconnect(sibling);
     await until(()=>sibling.evaluate("!!document.getElementById('ezr-root')"),'Toolbar absent from sibling tab');

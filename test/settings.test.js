@@ -56,6 +56,7 @@ test('normalizeSettings rejects unusable values field by field', () => {
     zoom: Number.NaN,
     theme: 'neon',
     showOutline: 0,
+    toolbarDock: 'side',
     rememberPerSite: 'true',
     restorePosition: undefined,
   };
@@ -69,6 +70,8 @@ test('normalizeSettings validates the enum and font fields', () => {
   assert.equal(normalizeSettings({ zoomMode: 'manual' }).zoomMode, 'manual');
   assert.equal(normalizeSettings({ theme: 'sepia' }).theme, 'sepia');
   assert.equal(normalizeSettings({ theme: 'auto' }).theme, 'auto');
+  assert.equal(normalizeSettings({ toolbarDock: 'bottom' }).toolbarDock, 'bottom');
+  assert.equal(normalizeSettings({ toolbarDock: 'top' }).toolbarDock, 'top');
   assert.equal(normalizeSettings({ fontId: 'mono-consolas' }).fontId, 'mono-consolas');
   assert.equal(normalizeSettings({ fontId: 'serif-palatino' }).fontId, 'serif-palatino');
   assert.equal(normalizeSettings({ capitalizeLocales: 'tr' }).capitalizeLocales, 'tr');
