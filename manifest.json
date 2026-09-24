@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EZ-Reader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "把网页任意区域转成分等级标题的类 Markdown 阅读视图：可换字体、可首字母大写、段间距大于 1.5 倍行距、自动缩放匹配。",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "activeTab", "scripting"],

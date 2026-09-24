@@ -1,6 +1,6 @@
 {
   "name": "ez-reader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "EZ-Reader — 把网页任意区域转成分等级标题的类 Markdown 阅读视图，缓解长段英文阅读压力。",
   "type": "module",
