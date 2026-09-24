@@ -27,7 +27,8 @@ function truncate(text, max) {
  * @param {{settings?: Object, title?: string, doc?: Document, onToggleOutline?: Function,
  *   onPickRegion?: Function, onToggleCapitalize?: Function, onFit?: Function,
  *   onZoom?: (delta: number) => void, onOpenOriginal?: Function, onOpenSettings?: Function,
- *   onClose?: Function, onFontQuick?: (id: string) => void}} [opts] 选项。
+ *   onClose?: Function, onFontQuick?: (id: string) => void,
+ *   onToggleDock?: (dock: 'top'|'bottom') => void}} [opts] 选项。
  * @returns {{update: (settings: Object) => void, setZoom: (zoom: number) => void,
  *   element: HTMLElement, destroy: () => void}} 句柄；`setZoom` 用于适配模式下同步百分比。
  */
@@ -39,6 +40,8 @@ export function createToolbar(container, opts = {}) {
   let current = opts.settings ?? null;
   let reportedZoom = 1;
   let previewing = false;
+  /** 读取设置中的停靠边；缺失或非法值默认按顶部处理。 */
+  const dockOf = (settings) => (settings && settings.toolbarDock === 'bottom' ? 'bottom' : 'top');
 
   const bar = doc.createElement('div');
   bar.className = 'ezr-toolbar';
@@ -150,6 +153,14 @@ export function createToolbar(container, opts = {}) {
   readingGroup.setAttribute('aria-label', '阅读与选区');
   readingGroup.append(originalBtn, pickBtn);
   bar.appendChild(makeButton('关闭工具栏', '关闭当前窗口的工具栏', () => fire(opts.onClose), 'ezr-btn-close'));
+
+  // 6) 切换停靠边：两种视图均可用，固定位于工具栏最右侧。
+  const dockBtn = makeButton('移到底部', '把工具栏停靠到窗口底部', () => {
+    fire(opts.onToggleDock, dockOf(current) === 'bottom' ? 'top' : 'bottom');
+  }, 'ezr-btn-dock');
+  dockBtn.setAttribute('aria-pressed', 'false');
+  bar.appendChild(dockBtn);
+
   bar.insertBefore(readingGroup, zoomGroup);
 
   container.appendChild(bar);
@@ -177,6 +188,13 @@ export function createToolbar(container, opts = {}) {
     const capsOn = settings.capitalizeFirst === true;
     capsBtn.setAttribute('aria-pressed', capsOn ? 'true' : 'false');
     capsBtn.classList.toggle('is-on', capsOn);
+    const atBottom = dockOf(settings) === 'bottom';
+    const dockLabel = atBottom ? '把工具栏停靠到窗口顶部' : '把工具栏停靠到窗口底部';
+    dockBtn.textContent = atBottom ? '移到顶部' : '移到底部';
+    dockBtn.setAttribute('aria-label', dockLabel);
+    dockBtn.setAttribute('title', dockLabel);
+    dockBtn.setAttribute('aria-pressed', String(atBottom));
+    dockBtn.classList.toggle('is-on', atBottom);
     if (Number.isFinite(settings.zoom)) {
       reportedZoom = settings.zoom;
       zoomLabel.textContent = previewing ? '—' : `${Math.round(settings.zoom * 100)}%`;

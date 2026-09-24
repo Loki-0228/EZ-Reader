@@ -102,6 +102,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // 外观
   theme: 'light',          // 'light' | 'sepia' | 'dark' | 'auto'
   showOutline: false,
+  toolbarDock: 'top',      // 'top' | 'bottom'：工具栏所停靠的窗口边缘
   // 行为
   rememberPerSite: true,
   restorePosition: true,
@@ -280,7 +281,8 @@ export function cssVarsFor(settings)
 - `@media print { .ezr-toolbar, .ezr-outline { display: none !important } }`
 - 不得出现任何远程 `url(...)`/`@import`/`@font-face` 网络引用。
 - `--ezr-scale` 用于 `.ezr-article { zoom: var(--ezr-scale) }` 或等价的 transform。
-- 工具栏“适配”切换到 `fit-width`：按阅读窗口可用宽度 / 设计列宽计算倍率，允许宽屏放大，范围 0.6–2.5；百分比必须与实际文字缩放同步。正文保留内边距，倍率未触及上限时正文列宽应等于窗口可用宽度。
+- 工具栏“适配”切换到 `fit-width`：按阅读窗口可用宽度与设计列宽之比计算缩放倍率，支持宽屏放大，范围为 0.6–2.5；显示的百分比必须与实际文字缩放保持同步。正文保留内边距；当倍率未达到上限时，正文列宽应等于窗口可用宽度。
+- 工具栏的停靠边由宿主 `#ezr-root` 上的 `data-ezr-dock`（`'top'` / `'bottom'`）决定。取值为 `bottom` 时，`:host` 必须锚定到窗口底部（`:host([data-ezr-original][data-ezr-dock="bottom"]) { top: auto !important; bottom: 0 !important; }`），工具栏分隔线翻至上侧，`.ezr-toolbar-host` 的阴影翻向上方。
 
 ## 14. 存储契约（`chrome.storage.local`）
 
@@ -349,4 +351,5 @@ export function cssVarsFor(settings)
 - `original-capitalization.js` 仅在原网页且 capitalizeFirst 为 true 时调整原元素 text-transform，保留节点/文字/事件目标。保护代码、编辑区、表单等子树不继承大写；新内容批量扫描，纯 characterData 翻译写入不触发重新扫描。切换视图、选区或关闭时恢复本扩展的样式，不覆盖网页后续更新；原网页划词从 Range 的原始文字读取，不以 CSS 变换后的 Selection 字符串作为缓存键。
 - `background/window-toolbar.js` 在可信后台以 `chrome.storage.session['ezr:toolbar:window:'+windowId]` 保存 enabled/revision。窗口内更新串行化，广播限定该窗口，可信 sender 决定窗口，不接受网页自报 windowId 或 tabId 越权。主框架内容脚本启动时查询；标签页激活、导航和跨窗口移动时同步；窗口关闭删除状态。保持 session 默认的可信上下文访问级别。
 - 内容脚本按窗口标识与 revision 忽略过期状态，异步挂载用 lifecycle 防止关闭后被迟到初始化重新打开。换页后重建原网页工具栏；已有同页阅读视图在重复打开时保持不变。关闭工具栏同步关闭本窗口，不影响其他窗口。页面受浏览器限制无法注入时显示可操作提示。
-- Esc 优先退出划词/设置/选区；简洁阅读中退回原网页，原网页中保留工具栏。只有明确关闭工具栏才结束窗口常驻。调试接口 open/close 可创建与清理局部非持久会话，不改变窗口状态。
+- Esc 键优先退出划词、设置与选区状态；在简洁阅读模式下按 Esc 退回原网页，在原网页模式下则保留工具栏。只有明确关闭工具栏，才会结束窗口常驻。调试接口 open/close 用于创建与清理局部非持久会话，不改变窗口状态。
+- 工具栏最右端是停靠切换按钮（`.ezr-btn-dock`），两种视图均可用，可在 `toolbarDock` 的 `top` 与 `bottom` 之间切换：设为 `bottom` 时，工具栏贴住窗口底部，原网页模式下不再遮挡页面顶部。`mount()` 中的 `setDock()` 会改写宿主属性 `data-ezr-dock`，并使 DOM 顺序与视觉顺序保持一致，正文滚动容器的引用保持不变。停靠边属于工具栏自身的属性，而非站点显示偏好，因此固定写入共享默认设置、对所有站点生效，且不写入 `byOrigin`；按钮文案、`title` 与 `aria-pressed` 均跟随当前停靠边。
