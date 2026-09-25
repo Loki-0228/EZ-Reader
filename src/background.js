@@ -20,8 +20,10 @@
 
 import { registerTranslation } from './translation/background.js';
 import { registerWindowToolbar } from './background/window-toolbar.js';
+import { registerDocuments } from './background/documents.js';
 
 registerTranslation();
+registerDocuments();
 registerWindowToolbar(chrome, { send, inject: injectContentScript });
 
 /* ------------------------------------------------------------------ constants */
@@ -383,6 +385,7 @@ try {
     const type = message && typeof message === 'object' ? message.type : undefined;
     if (typeof type !== 'string' || !type.startsWith('ezr:')) return undefined;
     if (type.startsWith('ezr:translation:')) return undefined;
+    if (type.startsWith('ezr:documents:')) return undefined;
     if (type.startsWith('ezr:window-toolbar:')) return undefined;
 
     handleMessage(type, message)

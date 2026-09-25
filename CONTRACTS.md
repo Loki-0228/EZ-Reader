@@ -5,7 +5,7 @@
 
 ## 0. 运行时约束
 
-- 零第三方运行库依赖。阅读、字体与排版本地完成；用户发起划词、全文翻译或开启划词预加载后，后台访问所选的 MyMemory / DeepSeek 接口，词语讲解按设置查询词典或 AI。只用 Node 24 标准库与浏览器原生 API。
+- 网页内容脚本使用原生 JavaScript，构建使用 Node 24 标准库。文档阅读页按下方契约使用固定版本、随扩展分发的解析库。阅读、字体与排版本地完成；用户发起翻译或开启自动划词翻译后，后台访问所选的 MyMemory / DeepSeek 接口，词语讲解按设置查询词典或 AI。
 - 源码为 **ESM**（`export` / `import`）。内容脚本无法原生 `import`，由 `tools/build.js`
   做「去 import/export + IIFE + 命名空间」的最小变换。因此：
   - 模块之间**只允许** `import { name } from './other.js'` 形式（具名导入，相对路径，必须带 `.js`）。
@@ -302,7 +302,11 @@ export function cssVarsFor(settings)
 
 - `src/ui/translation.js` 在阅读视图及显式开启的原网页中捕获选区、展示纯文本结果；原网页模式不生成卡片。默认点击才请求，开启 `preload` 后选区稳定 450ms 自动调用所选 `provider`。拖选过程中不预加载，隐藏/换选区取消未发出请求，旧请求结果不得生成卡片或保存。
 - `src/translation/background.js` 在 MV3 后台注册 `ezr:translation:*` 消息，原后台消息桥必须跳过该命名空间。可信来源取自 Chrome `sender`，不可由消息伪造标签页或网页地址。
-- `config` 返回 `{ ok, config: { enabled, source, target, model, provider, preload, explanations, wordCards, autoSave, level }, hasKey }`；`options` 打开扩展设置页；`save` 与 `clear-all` 仅允许扩展 options 页调用。`preferences` 只接受 enabled/source/target/model/provider/preload/explanations/wordCards/autoSave/level 白名单字段，不允许修改密钥；语义配置变更仍清除旧语境。
+- `config` 返回 `{ ok, config: { enabled, source, target, model, provider, preload, explanations, wordCards, autoSave, level, stylePrompt }, hasKey }`；`options` 打开扩展设置页；`save` 与 `clear-all` 仅允许扩展 options 页调用。`preferences` 只接受 enabled/source/target/model/provider/preload/explanations/wordCards/autoSave/level/stylePrompt 白名单字段，不允许修改密钥；语义配置变更仍清除旧语境。
+- `stylePrompt` 是用户自定的翻译风格补充指令，最多 500 字符，空值表示不追加。DeepSeek 路径把它编码为 JSON 字符串并追加在 `TRANSLATE_PROMPT` 之后，并声明其优先级低于既有规则：风格行只调整表达，不能取消「只输出译文」等约束，也不能被当作可执行指令。免费翻译不接受指令，`stylePrompt` 对其无效。该字段参与 `translationContextKey`，因此修改风格会使已缓存的译文与语境失效。
+- `ezr:translation:text` 是输入文本翻译入口，只允许网页发送，语义与 `run` 相同，但普通输入使用 `<tabId>:<frameId>/text` 会话槽，浏览器右键选文通过 scope=selection 使用 `/selected-text` 槽，均带 `freeform: true`：自由输入没有文章可取，服务端因此跳过语境分析，且不会挤掉同一标签页阅读会话的语境与缓存。自由输入仍受 1–2000 字符限制。此显式请求不受划词翻译 enabled 开关限制，UI 不传递当前网页标题、正文或语言作为待译内容。
+- `save` 以合并而非替换的方式写入配置：选项页只渲染部分字段，整体替换会静默丢掉它不渲染的字段（例如 `stylePrompt`）。未知键仍由 `normalizeTranslation` 丢弃。save 与 preferences 共用写入队列，在队列内读取最新存量，避免并发保存丢失字段。
+- 手输浮窗保留尚未保存的输入，旧保存回复和 storage 事件不能覆盖新草稿。翻译前等待设置落库，保存失败可重试；关闭或销毁浮窗前提交待保存草稿。请求期间禁用输入、设置与清空，修改输入后清除旧译文。浮窗受视口边界约束，高度不足时内部滚动。
 - `run` 输入 `{ provider: 'free'|'deepseek', text, nearby, view: { id, title, context, language } }`；成功返回 `{ ok: true, text, provider, target, cached?, contextReused? }`，失败返回 `{ ok: false, message }`。一次选文不超过 2000 字符。
 - `clear` 只清除消息发送者对应标签页/框架的语境。导航、关闭阅读、重新选区、修改语言/模型/密钥使旧语境失效。每次请求通过文档、URL、阅读区域与语义配置指纹复核隔离；切换服务偏好、自动开关与学习水平可复用摘要。
 - 公共翻译配置写入 `chrome.storage.local['ezr:translation:config']`。API Key 仅保存于扩展源的 IndexedDB `ezr-private/credentials`，只由后台读取，不进入公共配置、页面 DOM、日志或响应消息。
@@ -340,16 +344,41 @@ export function cssVarsFor(settings)
 - `full-translation.js` 持有当前文档的原文快照、按 provider 隔离的纯译文缓存与请求状态。阅读器提取及区域选择期间临时恢复源文；设置重绘、双语切换、跨视图使用相同文本缓存。URL/语言/模型改变取消旧任务并清空；切换服务停止当前翻译，保留两种服务各自的缓存；停止后迟到响应只缓存，不重新替换页面。
 - 后台全文缓存位于同框架 `/full` 会话，每段包括 pending Promise；全文学习使用 `/page` 会话。仅在同标签页/框架、同文档/URL/view 指纹下共享摘要；关闭阅读器不清除全文缓存。导航/语义配置改变清除所有相关会话。worker 全文内存缓存最多 3000 段，UI 文档缓存刷新即失效，不持久化原文。
 - `full` 可返回 `{results, error}` 部分成功结果，首个失败中止尚未发出的批内请求，成功片段立即缓存并供 UI 使用。免费 API 小块结果也缓存，重试不会重复发送成功小块；并发完全重复的请求共享 Promise。
-- 划词只处理当前显示的原文，原网页模式与阅读模式共用全局 enabled/preload/provider 设置，无独立网页划词开关。选区与任意已生成译文节点相交即拒绝，包括跨段和原译文混合选区；不显示浮层、不预加载、不反查原词。切换显示模式、重绘译文、关闭阅读器时取消待触发划词与丢弃迟到结果。选文与全文片段完全相同时可复用其译文，讲解/生词筛选独立缓存且带用户 `level`，改变水平不得触发全文重译。
+- 划词读取用户实际选中的文字，包括当前显示的译文；原网页模式与阅读模式共用 enabled/preload/provider/target 设置，无独立网页划词开关，不反查原词。切换显示模式、重绘译文、关闭阅读器时取消待触发划词与丢弃迟到结果。选文与全文片段完全相同时可复用其译文，讲解/生词筛选独立缓存且带用户 `level`，改变水平不得触发全文重译。
 - `translation-notes.js` 仅接收已有卡片，不调用翻译 API。最多显示 24 个临时批注，>=1100px 时正文左右各留 220px，窄屏只显示最近一张底部卡片。保存和 Anki 导出必须由已有的独立规则触发。
 
 ## 20. 窗口工具栏与视图可用性
 
-- 扩展弹窗只有“打开工具栏”主操作。页面上默认挂载原网页工具栏，未点击简洁阅读前不提取正文，不自动请求翻译。空正文页面同样能使用工具栏、选区和网页翻译。
+- 扩展弹窗提供“打开工具栏”主操作和“打开 PDF”入口。页面上默认挂载原网页工具栏，未点击简洁阅读前不提取正文，不自动请求翻译。空正文页面同样能使用工具栏、选区和网页翻译。
 - 选区仅在原网页视图可用；缩放、字体和大纲仅在简洁阅读中可用。阅读切换与选区是一个带 role=group 的左右两段控件，窄屏不拆开换行。不可用控件使用原生 disabled 并提供 title 原因；按钮、快捷键和选区消息入口都必须遵循视图限制。大写、设置、翻译与关闭两种视图均可用。
 - 设置抽屉在原网页显示通用翻译偏好、配色、大写和站点显示偏好，隐藏并禁用排版与词语学习控件。`translation-settings.js` 使用独立翻译配置协议，不把翻译偏好混入站点排版设置，不接触密钥；保存期间防止重入并同步 storage 变化，销毁后移除监听。原网页的界面重置仅恢复配色、大写和显示记忆偏好，不清除翻译设置与阅读排版。
-- `original-capitalization.js` 仅在原网页且 capitalizeFirst 为 true 时调整原元素 text-transform，保留节点/文字/事件目标。保护代码、编辑区、表单等子树不继承大写；新内容批量扫描，纯 characterData 翻译写入不触发重新扫描。切换视图、选区或关闭时恢复本扩展的样式，不覆盖网页后续更新；原网页划词从 Range 的原始文字读取，不以 CSS 变换后的 Selection 字符串作为缓存键。
+- `original-capitalization.js` 仅在原网页且 capitalizeFirst 为 true 时调整原元素 text-transform，保留节点/文字/事件目标。保护代码、编辑区、表单等子树不继承大写；新内容批量扫描，纯 characterData 翻译写入不触发重新扫描。切换视图、选区或关闭时恢复本扩展的样式，不覆盖网页后续更新；划词直接使用浏览器返回的选中文字，Range 只用于定位，不重建文本。
 - `background/window-toolbar.js` 在可信后台以 `chrome.storage.session['ezr:toolbar:window:'+windowId]` 保存 enabled/revision。窗口内更新串行化，广播限定该窗口，可信 sender 决定窗口，不接受网页自报 windowId 或 tabId 越权。主框架内容脚本启动时查询；标签页激活、导航和跨窗口移动时同步；窗口关闭删除状态。保持 session 默认的可信上下文访问级别。
-- 内容脚本按窗口标识与 revision 忽略过期状态，异步挂载用 lifecycle 防止关闭后被迟到初始化重新打开。换页后重建原网页工具栏；已有同页阅读视图在重复打开时保持不变。关闭工具栏同步关闭本窗口，不影响其他窗口。页面受浏览器限制无法注入时显示可操作提示。
-- Esc 键优先退出划词、设置与选区状态；在简洁阅读模式下按 Esc 退回原网页，在原网页模式下则保留工具栏。只有明确关闭工具栏，才会结束窗口常驻。调试接口 open/close 用于创建与清理局部非持久会话，不改变窗口状态。
-- 工具栏最右端是停靠切换按钮（`.ezr-btn-dock`），两种视图均可用，可在 `toolbarDock` 的 `top` 与 `bottom` 之间切换：设为 `bottom` 时，工具栏贴住窗口底部，原网页模式下不再遮挡页面顶部。`mount()` 中的 `setDock()` 会改写宿主属性 `data-ezr-dock`，并使 DOM 顺序与视觉顺序保持一致，正文滚动容器的引用保持不变。停靠边属于工具栏自身的属性，而非站点显示偏好，因此固定写入共享默认设置、对所有站点生效，且不写入 `byOrigin`；按钮文案、`title` 与 `aria-pressed` 均跟随当前停靠边。
+- 内容脚本按窗口标识与 revision 忽略过期状态，异步挂载用 lifecycle 防止关闭后被迟到初始化重新打开。换页后重建原网页工具栏；已有同页阅读视图在重复打开时保持不变。主工具栏的 × 仅隐藏当前页主栏，保留阅读会话、翻译工具和框架划词。相同 revision 的窗口同步不重新显示主栏；用户从扩展面板显式打开产生新 revision 后才恢复主栏。页面受浏览器限制无法注入时显示可操作提示。
+- Esc 键优先退出划词、设置与选区状态；在简洁阅读模式下按 Esc 退回原网页，在原网页模式下则保留工具栏。主栏和翻译栏的关闭图标只控制各自可见性，不结束窗口内的翻译支持。调试接口 open/close 用于创建与清理局部非持久会话，不改变窗口状态。
+- 工具栏按钮区域的末端是停靠切换按钮（`.ezr-btn-dock`），最右侧另设灰色关闭图标，两种视图均可用，可在 `toolbarDock` 的 `top` 与 `bottom` 之间切换：设为 `bottom` 时，工具栏贴住窗口底部，原网页模式下不再遮挡页面顶部。`mount()` 中的 `setDock()` 会改写宿主属性 `data-ezr-dock`，并使 DOM 顺序与视觉顺序保持一致，正文滚动容器的引用保持不变。停靠边属于工具栏自身的属性，而非站点显示偏好，因此固定写入共享默认设置、对所有站点生效，且不写入 `byOrigin`；按钮文案、`title` 与 `aria-pressed` 均跟随当前停靠边。
+
+## 文档阅读与选区读取
+
+- src/dom/user-selection.js 读取真实 Selection.toString() 或文本控件的 selectionStart/selectionEnd；不再要求选中文字经正文提取器识别，不读取密码框或剪贴板。range 可为空，UI 必须兼容文本控件。
+- src/dom/document-sources.js 只发现明确的 PDF 及 Canvas 文件入口；所有框架分别发现，后台按 URL 去重。
+- 非主框架在当前窗口工具栏启用后创建独立的划词浮层。文档身份、请求及缓存仍由 Chrome sender 的 tabId/frameId/documentId 隔离。
+- 原生查看器使用 contextMenus.selectionText 获取用户选中文字；入口数据仅临时保存在 storage.session，30 分钟过期，最多保留 16 项。
+- 文档阅读页面是 pages/document-reader.html。只有该受信任扩展页可在 chrome-extension 协议下调用翻译服务；普通页面不能伪造 sender。
+- src/documents/parser.js 只打开 PDF，并按需提取按页文字；PDF 原貌由随包 PDF.js PDFViewer 提供，不执行 PDF 脚本或表单。第三方解析库固定版本打包在 src/vendor，不进入内容脚本 bundle，也不从 CDN 动态执行代码。
+- 文件和文字大小有明确上限；扫描件、受限链接、不支持格式及加密文档必须给出说明，不用随机字符串扫描冒充解析结果。
+
+## 统一翻译工具栏
+
+- 主工具栏仅有一个翻译入口，展开或收起子工具栏。输入文字入口移到翻译栏，复用原有输入浮窗；划词 enabled 开关也只在翻译栏展示。
+- 全文翻译与显示原文为同一按钮的互斥状态，停止或切回原文后保留已完成缓存。关闭划词不清除全文缓存，不影响输入/全文翻译。选中译文也可显示浮窗，不读取密码输入。
+- 两栏共享标题列宽、按钮起点、30px 控件高度及最右侧灰色 SVG 关闭按钮。子工具栏放在同一 toolbarHost 内，随主工具栏一起停靠。
+- PDF 入口由 popup 直接调用共享 openPdfForTab/createPdfEntry 创建视图，文档页直接读取受信任 session 数据，不把缺失后台响应作为打开页面的前置条件。原生 PDF 通过该扩展视图提供浮窗；网页 PDF 控件由帧内内容脚本读取选区。
+- PDF 页仅允许 __ezr.setPdfDocument 注入受限文本数据构建阅读 IR；全文翻译不改动 PDF canvas/文本层。PPT/PPTX 解析及其依赖从本版移除。
+
+## 翻译目标语言与工具栏独立关闭
+
+- target 为全文、网页/框架划词和浏览器右键选文的共同目标语言，翻译工具栏提供「译为」选框；textTarget 仅用于输入文字翻译。原文语言、翻译风格和服务偏好仍按现有共享配置处理。
+- 旧配置首次写入前先 normalize，以原目标语言初始化缺失的 textTarget，再合并字段补丁，避免第一次修改阅读目标时连带改变输入目标。
+- 后台只从已保存配置选择目标，不接受任意请求目标覆盖。输入请求的 fullDocument 标记固定为 false，普通输入使用 /text，会话和缓存按目标作用范围分别失效。修改输入目标不关闭划词浮窗、不重置全文缓存；修改阅读目标不取消输入翻译请求。
+- 主栏关闭不销毁 session、不发送禁用窗口工具的消息、不切换阅读视图。主栏 hidden 受明确 CSS 规则控制，隐藏时不响应主栏快捷键。翻译栏独立保留；扩展面板或 PDF 的「工具栏」按钮可恢复主栏。

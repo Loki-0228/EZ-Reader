@@ -27,11 +27,11 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
     });
     row.append(copy, input); parent.appendChild(row); controls.set(key, input);
   };
-  add('enabled', '开启划词翻译', '两种视图都只翻译选中的原文');
+  container.appendChild(make('p', 'ezr-field-description', '划词翻译开关位于翻译工具栏，开启后选中文字即可显示浮窗。'));
   add('preload', '划词后自动翻译', '选区稳定后，仅请求当前所选服务');
   add('provider', '翻译服务', '', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
   add('source', '原文语言', '', [['auto', '自动识别'], ...LANGUAGES]);
-  add('target', '目标语言', '', LANGUAGES);
+  add('target', '全文与划词目标语言', '也可在翻译工具栏中切换', LANGUAGES);
   add('model', 'DeepSeek 模型', '', MODELS.map(model => [model, model]));
   const learning = make('div', 'ezr-settings-learning');
   learning.appendChild(make('h4', 'ezr-settings-subtitle', '词语学习'));

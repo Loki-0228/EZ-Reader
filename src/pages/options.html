@@ -18,9 +18,9 @@
       </header>
 
       <section class="card translation-card" id="sec-translation" aria-labelledby="translation-heading">
-        <h2 id="translation-heading" class="card__title">划词翻译</h2>
+        <h2 id="translation-heading" class="card__title">翻译设置</h2>
         <p class="note">选中文字后点击翻译，或开启预加载，让选区稳定后自动显示译文。</p>
-        <label class="translation-toggle"><input type="checkbox" id="translation-enabled" /> 开启划词翻译</label>
+        <p class="note">划词翻译开关位于网页的翻译工具栏，开启后选中文字自动显示浮窗。</p>
         <label class="translation-field">当前翻译服务<select class="control" id="translation-provider"></select></label>
         <div class="translation-preferences">
           <label class="translation-toggle"><input type="checkbox" id="translation-preload" /> 划词后自动翻译（预加载）</label>
@@ -34,7 +34,7 @@
         </div>
         <div class="translation-grid">
           <label>原文语言<select class="control" id="translation-source"></select></label>
-          <label>目标语言<select class="control" id="translation-target"></select></label>
+          <label>全文与划词目标语言<select class="control" id="translation-target"></select></label>
         </div>
         <p class="note">免费翻译使用 MyMemory，无需密钥，有服务额度限制。英文词语会附上词典释义和例句；其他语言可使用 AI 卡片。</p>
         <label class="translation-field">DeepSeek 模型<select class="control" id="translation-model"></select></label>

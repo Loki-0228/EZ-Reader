@@ -189,6 +189,11 @@ export function mount(opts = {}) {
   /**
    * 将工具栏移动到指定的窗口边缘。
    * DOM 顺序与视觉顺序一致，使键盘 Tab 遍历顺序与停靠位置对应。
+   *
+   * 顶部停靠固定插到 `root` 的第一个子节点之前，而不是"`.ezr-body` 之前"：
+   * 其它面板（如全文翻译条）也会插在 `.ezr-body` 之前，若以 `.ezr-body` 为锚点，
+   * 工具栏会被排到那层面板下方。本函数在每次设置变更时都会执行，因此锚点必须
+   * 与这些面板无关，重复调用才能得到同样的结果。
    * @param {unknown} dock `'top'` 或 `'bottom'`；其它值按 `'top'` 处理。
    * @returns {'top'|'bottom'} 实际生效的停靠边。
    */
@@ -196,7 +201,7 @@ export function mount(opts = {}) {
     const side = dock === 'bottom' ? 'bottom' : 'top';
     try {
       if (side === 'bottom') root.insertBefore(toolbarHost, toastHost);
-      else root.insertBefore(toolbarHost, body);
+      else if (root.firstChild !== toolbarHost) root.insertBefore(toolbarHost, root.firstChild);
     } catch {
       /* 宿主结构异常时保持当前顺序 */
     }

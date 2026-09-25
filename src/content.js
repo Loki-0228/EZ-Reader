@@ -27,7 +27,10 @@ import { createToast } from './ui/toast.js';
 import { createToolbar } from './ui/toolbar.js';
 import { createZoomWatcher } from './ui/zoom.js';
 import { createTranslation } from './ui/translation.js';
+import { createTextTranslation } from './ui/text-input-translation.js';
 import { createFullTranslation } from './ui/full-translation.js';
+import { createFrameSelection } from './ui/frame-selection.js';
+import { findDocumentSources } from './dom/document-sources.js';
 
 const GUARD = '__EZR_CONTENT_LOADED__';
 if (!globalThis[GUARD]) {
@@ -40,10 +43,14 @@ function bootstrap() {
   if (!doc || !doc.documentElement) return;
 
   const isTopFrame = globalThis.top === globalThis;
+  const isDocumentReader = typeof chrome !== 'undefined' && doc.location.href.split(/[?#]/)[0] === chrome.runtime.getURL('pages/document-reader.html');
+  globalThis.__ezrDocumentSources = () => findDocumentSources(doc);
+  const frameSelection = !isTopFrame ? createFrameSelection(doc) : null;
   const hasStorage = typeof chrome !== 'undefined' && !!chrome.storage && !!chrome.storage.local;
 
   /** @type {null | object} */
   let session = null;
+  let pdfDocument = null;
   let activePicker = null;
   let pickerOverlay = null;
   let restoreAfterPick = null;
@@ -282,8 +289,11 @@ function bootstrap() {
 
     const abort = new AbortController();
     const translation = createTranslation({ root: shell.root, article: shell.article, getDocument: () => currentDoc, doc,
-      canSelect: range => !fullTranslation.isTranslatedSelection(range), getView: () => fullTranslation.getView(),
+      getView: () => fullTranslation.getView(),
       onCards: (cards, range) => fullTranslation.addCards(cards, range) });
+
+    // Free-form translation works in both views: it never depends on the article.
+    const textTranslation = createTextTranslation({ root: shell.root, doc });
 
     const zoom = createZoomWatcher({
       doc,
@@ -299,6 +309,7 @@ function bootstrap() {
 
     const toolbar = createToolbar(shell.toolbarHost, {
       settings,
+      isPdf:isDocumentReader,
       // A per-origin record may only contain a few keys; the toolbar needs the
       // resolved values, and the settings panel needs the origin's own overrides so
       // its controls show "default" for fields this site never changed.
@@ -323,7 +334,7 @@ function bootstrap() {
         settingsStore.update({ zoomMode: 'manual', zoom: next });
       },
       onOpenOriginal: () => setPreviewing(!previewing),
-      onFullTranslation: () => fullTranslation.show(),
+      onFullTranslation: () => fullTranslation.toggle(),
       onOpenSettings: () => {
         translation.close();
         fullTranslation.closeSelection();
@@ -351,7 +362,7 @@ function bootstrap() {
 
     function setPreviewing(value) {
       if (destroyed || previewing === !!value) return;
-      if (!value && !currentDoc.blocks.length) { void open(); return; }
+      if (!value && !currentDoc.blocks.length) { void open().catch(error => notify(error.message, 'warn')); return; }
       if (value) {
         translation.close();
         savePosition();
@@ -362,7 +373,7 @@ function bootstrap() {
       shell.host.toggleAttribute('data-ezr-original', previewing);
       toolbar.setPreviewing(previewing);
       settingsPanel.setPreviewing(previewing);
-      originalCapitalization.setEnabled(previewing && settingsStore.get().capitalizeFirst);
+      originalCapitalization.setEnabled(!isDocumentReader && (previewing && settingsStore.get().capitalizeFirst));
       fullTranslation.previewChanged();
       if (!previewing) {
         scroller.scrollTop = readingScrollTop;
@@ -410,8 +421,14 @@ function bootstrap() {
 
     paint(currentDoc, settings);
     toolbar.setPreviewing(previewing);
-    originalCapitalization.setEnabled(previewing && settings.capitalizeFirst);
-    fullTranslation.bindReader({ root: shell.root, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close() });
+    originalCapitalization.setEnabled(!isDocumentReader && (previewing && settings.capitalizeFirst));
+    fullTranslation.bindReader({ root: shell.root, toolbarHost:shell.toolbarHost, isPdf:isDocumentReader, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close(),
+      openTextTranslation: () => { translation.close(); fullTranslation.closeSelection(); settingsPanel.close(); textTranslation.toggle(); },
+      onTranslationVisibility: value => toolbar.setTranslationOpen(value),
+      isMainToolbarVisible: () => !toolbar.element.hidden,
+      showMainToolbar: () => { toolbar.element.hidden = false; fullTranslation.mainToolbarChanged(); },
+      prepareTranslation: isDocumentReader ? async () => { if (!currentDoc.blocks.length) { const result = await open(); if (!result?.ok) throw new Error('PDF 文字尚未准备好，请稍后重试。'); } else setPreviewing(false); } : null,
+      showOriginal: isDocumentReader ? () => setPreviewing(true) : null });
     outline.setOpen(!!settings.showOutline);
     shell.outline.classList.toggle('is-open', !!settings.showOutline);
 
@@ -446,6 +463,12 @@ function bootstrap() {
           settingsPanel.close();
           return;
         }
+        if (textTranslation.isOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          textTranslation.close();
+          return;
+        }
         event.stopPropagation();
         if (!previewing) setPreviewing(true);
       },
@@ -459,9 +482,12 @@ function bootstrap() {
       shell,
       toast,
       scroller,
+      hideMainToolbar() { toolbar.element.hidden = true; settingsPanel.close(); fullTranslation.mainToolbarChanged(); },
+      showMainToolbar() { toolbar.element.hidden = false; fullTranslation.mainToolbarChanged(); },
       setPreviewing,
       get documentUrl() { return documentUrl; },
       get hasDocument() { return currentDoc.blocks.length > 0; },
+      translateText(text) { textTranslation.openText(text, true, true); },
       get previewing() { return previewing; },
       /** @param {object} nextSettings */
       applySettings(nextSettings) {
@@ -473,7 +499,7 @@ function bootstrap() {
         toolbar.update(nextSettings);
         toolbar.setZoom(zoomState.scale);
         settingsPanel.update(nextSettings);
-        originalCapitalization.setEnabled(previewing && !activePicker && nextSettings.capitalizeFirst);
+        originalCapitalization.setEnabled(!isDocumentReader && (previewing && !activePicker && nextSettings.capitalizeFirst));
         paint(currentDoc, nextSettings);
         zoom.recalc();
       },
@@ -497,6 +523,7 @@ function bootstrap() {
         translation.destroy();
         fullTranslation.unbindReader();
         settingsPanel.destroy();
+        textTranslation.destroy();
         toolbar.destroy();
         outline.destroy();
         toast.destroy();
@@ -519,6 +546,7 @@ function bootstrap() {
   /* ----------------------------------------------------------------- picking */
 
   function startPick() {
+    if (isDocumentReader) return { ok:false, reason:'pdf-view', message:'PDF 请直接选择文字翻译，或使用全文翻译。' };
     if (session && !session.previewing) return { ok: false, reason: 'wrong-view', message: '请先切换到原网页，再选择区域。' };
     if (activePicker) {
       endPick();
@@ -589,7 +617,7 @@ function bootstrap() {
     restoreAfterPick = null;
     if (restore) restore();
     fullTranslation.afterRead();
-    originalCapitalization.setEnabled(session?.previewing && settingsStore.get().capitalizeFirst);
+    originalCapitalization.setEnabled(!isDocumentReader && (session?.previewing && settingsStore.get().capitalizeFirst));
   }
 
   /* -------------------------------------------------------------- open/close */
@@ -614,11 +642,16 @@ function bootstrap() {
 
       let root = null;
       let irDoc = null;
+      if (isDocumentReader) {
+        if (!pdfDocument) await globalThis.__ezrPreparePdf?.();
+        if (!pdfDocument) throw new Error('PDF 尚未准备好，请先打开 PDF。');
+        root = doc.body; irDoc = pdfDocument;
+      }
 
       // Reuse the region this site was last read with, when it still exists.
-      if (options.srcPath) {
+      if (!irDoc && options.srcPath) {
         root = resolveRoot({ doc, srcPath: options.srcPath, selection: null });
-        if (root) irDoc = buildDocFromElement(root, { doc, settings });
+        if (root) irDoc = buildDocFromElement(root, { doc, settings, minTextChars:isDocumentReader ? 1 : undefined });
       }
       if (!irDoc) {
         // Keep the source element alongside its IR for re-selection.
@@ -640,6 +673,7 @@ function bootstrap() {
         return { ok: false, reason: 'empty' };
       }
 
+      if (generation !== lifecycle) return { ok:false, reason:'cancelled' };
       if (session) { session.reload(root, irDoc); session.setPreviewing(false); }
       else session = createSession(irDoc, settings);
       const stats = textStats(irDoc);
@@ -653,7 +687,7 @@ function bootstrap() {
     } finally {
       busy = false;
       fullTranslation.afterRead();
-      originalCapitalization.setEnabled(session?.previewing && settingsStore.get().capitalizeFirst);
+      originalCapitalization.setEnabled(!isDocumentReader && (session?.previewing && settingsStore.get().capitalizeFirst));
     }
   }
 
@@ -669,9 +703,9 @@ function bootstrap() {
     return { ok: true };
   }
 
-  async function showToolbar() {
+  async function showToolbar(revealMain = true) {
     if (session && session.documentUrl !== doc.location.href) close();
-    if (session) return { ok: true, already: true };
+    if (session) { if (revealMain) session.showMainToolbar(); return { ok: true, already: true }; }
     const generation = ++lifecycle;
     const settings = await settingsStore.load();
     if (generation !== lifecycle) return { ok: false, reason: 'cancelled' };
@@ -683,17 +717,18 @@ function bootstrap() {
     if (!state.configured) return { ok: true };
     if (toolbarWindowId !== state.windowId) { windowRevision = -1; toolbarWindowId = state.windowId; windowClosing = false; }
     if (state.revision < windowRevision || (windowClosing && state.revision <= windowRevision)) return { ok: true, stale: true };
+    const revealMain = state.revision > windowRevision;
     windowRevision = state.revision; windowClosing = false;
-    if (state.enabled) { windowManaged = true; return showToolbar(); }
+    if (state.enabled) { windowManaged = true; return showToolbar(revealMain); }
     // Window synchronization owns only sessions it opened, not local automation/debug sessions.
     if (windowManaged) close();
     windowManaged = false; return { ok: true };
   }
 
   function closeWindowTools() {
-    windowClosing = true;
-    close();
-    void chrome.runtime.sendMessage({ type: 'ezr:window-toolbar:set', enabled: false }).catch(() => {});
+    // This closes the main toolbar only. The reader and translation tools keep
+    // their sessions; window synchronization must also keep frame selection alive.
+    session?.hideMainToolbar();
   }
 
   function cjkDominant(irDoc) {
@@ -720,6 +755,9 @@ function bootstrap() {
    */
   async function handleMessage(type, message = {}) {
     switch (type) {
+      case 'ezr:frame-toolbar-state':
+        frameSelection?.setEnabled(message.enabled, message.revision, message.windowId);
+        return { ok:true, topFrame:isTopFrame };
       case 'ezr:toolbar-state':
         return isTopFrame ? applyToolbarState(message) : { ok: true, topFrame: false };
       case 'ezr:toolbar-open':
@@ -750,6 +788,11 @@ function bootstrap() {
     if (!isTopFrame) return { ok: true, topFrame: false, active: false, ack: type };
 
     switch (type) {
+      case 'ezr:translate-selection':
+        if (!isDocumentReader) return { ok:false, reason:'document-reader-only' };
+        if (!session) await showToolbar();
+        session.translateText(String(message.text || ''));
+        return { ok:true };
       case 'ezr:toggle':
         return session ? close() : open(message.options || {});
       case 'ezr:open':
@@ -783,7 +826,7 @@ function bootstrap() {
     }
   }
 
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  if (!isDocumentReader && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const type = message && message.type;
       // Only reply to our own namespaced messages, and never swallow another
@@ -805,6 +848,20 @@ function bootstrap() {
   globalThis.__ezr = {
     open,
     close,
+    setPdfDocument(parsed) {
+      if (!isDocumentReader) return { ok:false };
+      if (!parsed) { pdfDocument = null; return { ok:true }; }
+      if (!Array.isArray(parsed.pages) || parsed.pages.length > 1000) throw new Error('PDF 页数超过限制。');
+      const blocks = []; let chars = 0;
+      for (const [index, page] of parsed.pages.entries()) {
+        const text = String(page.text || ''); chars += text.length;
+        if (chars > 2_000_000) throw new Error('PDF 文字超过限制，请拆分文件。');
+        blocks.push({ type:'heading', level:2, text:String(page.title || '第 ' + (index + 1) + ' 页') });
+        if (text.trim()) blocks.push({ type:'para', text, lines:text.split(/\r?\n/) });
+      }
+      pdfDocument = { title:String(parsed.title || doc.title), blocks, srcPath:null, truncated:false };
+      return { ok:true };
+    },
     toggle: () => (session ? close() : open({})),
     pick: () => handleMessage('ezr:pick'),
     send: (message) => handleMessage(message && message.type, message || {}),
@@ -885,7 +942,7 @@ function bootstrap() {
   };
 
   if (!isTopFrame) void settingsStore.load();
-  else if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+  else if (!isDocumentReader && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     const generation = lifecycle;
     void chrome.runtime.sendMessage({ type: 'ezr:window-toolbar:get' }).then(state => {
       if (state?.ok && generation === lifecycle) return applyToolbarState(state);

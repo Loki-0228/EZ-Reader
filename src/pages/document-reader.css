@@ -1,0 +1,20 @@
+:root { color-scheme:light dark; font:13px/1.5 'Segoe UI','Microsoft YaHei',sans-serif; --ezr-top-inset:0px; --ezr-bottom-inset:0px; --pdf-nav-height:46px; --paper:#fff; --ink:#263246; --line:#dce1e8; --accent:#3c73cb; background:#e9ecf0; color:var(--ink); }
+* { box-sizing:border-box; }
+body { margin:0; }
+[hidden] { display:none!important; }
+#pdf-navigation { position:fixed; top:var(--ezr-top-inset); inset-inline:0; min-height:46px; display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 16px; z-index:3; background:var(--paper); border-bottom:1px solid var(--line); }
+#pdf-navigation label { display:flex; align-items:center; gap:6px; }
+button,select,.pdf-file-button,#pdf-page { min-height:30px; padding:4px 9px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--ink); font:inherit; }
+button,.pdf-file-button { cursor:pointer; }
+button:hover,.pdf-file-button:hover { background:color-mix(in srgb,var(--accent) 8%,var(--paper)); }
+:focus-visible,.pdf-file-button:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+.pdf-file-button { position:relative; overflow:hidden; }
+.pdf-file-button input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+#pdf-page { width:62px; text-align:center; font-variant-numeric:tabular-nums; }
+#source-form { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+#pdf-source { max-width:280px; }
+#pdf-status { position:fixed; z-index:4; top:calc(var(--ezr-top-inset) + var(--pdf-nav-height) + 12px); left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); margin:0; padding:12px 16px; background:var(--paper); border:1px solid var(--line); border-radius:8px; overflow-wrap:anywhere; }
+#pdf-container { position:absolute; inset:calc(var(--ezr-top-inset) + var(--pdf-nav-height)) 0 var(--ezr-bottom-inset); overflow:auto; overscroll-behavior:contain; }
+#pdf-pages { padding-top:18px; }
+::selection { background:#3c73cb40; }
+@media(prefers-color-scheme:dark) { :root { --paper:#202630; --ink:#e3e9f2; --line:#434d5c; background:#303743; } }

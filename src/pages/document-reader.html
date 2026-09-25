@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDF 阅读 · EZ-Reader</title>
+  <link rel="stylesheet" href="../vendor/pdfjs/pdf_viewer.css">
+  <link rel="stylesheet" href="document-reader.css">
+</head>
+<body>
+  <nav id="pdf-navigation" data-ezr-ui aria-label="PDF 控制">
+    <label class="pdf-file-button">打开文件<input id="pdf-file" type="file" accept=".pdf,application/pdf"></label>
+    <label>页码 <input id="pdf-page" type="number" value="1" min="1" aria-label="PDF 页码"><span id="pdf-total"></span></label>
+    <button id="pdf-fit" type="button">适应宽度</button>
+    <button id="open-toolbar" type="button">工具栏</button>
+    <button id="cancel-load" type="button" hidden>停止打开</button>
+    <form id="source-form" hidden><label for="pdf-source">页面中的 PDF</label><select id="pdf-source"></select><button type="submit">打开 PDF</button></form>
+  </nav>
+  <p id="pdf-status" data-ezr-ui role="status" aria-live="polite" hidden></p>
+  <div id="pdf-container" tabindex="0" aria-label="PDF 原文"><div id="pdf-pages" class="pdfViewer"></div></div>
+  <script src="../content.js"></script>
+  <script type="module" src="document-reader.js"></script>
+</body>
+</html>

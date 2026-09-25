@@ -16,7 +16,7 @@
  * Usage: node tools/build.js
  */
 
-import { readFile, writeFile, mkdir, rm, readdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, readdir, copyFile, cp } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,10 @@ const ENTRY = 'src/content.js';
 const STATIC_GLUE = [
   { from: 'src/background/window-toolbar.js', to: 'background/window-toolbar.js' },
   { from: 'manifest.json', to: 'manifest.json' },
+  { from: 'src/background/documents.js', to: 'background/documents.js' },
+  { from: 'src/pages/document-reader.html', to: 'pages/document-reader.html' },
+  { from: 'src/pages/document-reader.css', to: 'pages/document-reader.css' },
+  { from: 'src/pages/document-reader.js', to: 'pages/document-reader.js' },
   { from: 'src/pages/popup.html', to: 'pages/popup.html' },
   { from: 'src/pages/popup.css', to: 'pages/popup.css' },
   { from: 'src/pages/popup.js', to: 'pages/popup.js' },
@@ -57,6 +61,15 @@ const STATIC_GLUE = [
 /** Paths the manifest references that MUST exist in the built extension. */
 const REQUIRED_OUTPUT = [
   'manifest.json',
+  'background/documents.js',
+  'pages/document-reader.html',
+  'pages/document-reader.js',
+  'pages/document-reader.css',
+  'documents/parser.js',
+  'vendor/pdfjs/pdf.mjs',
+  'vendor/pdfjs/pdf.worker.mjs',
+  'vendor/pdfjs/pdf_viewer.mjs',
+  'vendor/pdfjs/pdf_viewer.css',
   'content.js',
   'background.js',
   'background/window-toolbar.js',
@@ -96,6 +109,9 @@ function listModules() {
 
 async function copyStatic() {
   const skipped = [];
+  for (const directory of ['documents', 'vendor/pdfjs']) {
+    await cp(path.join(SRC, directory), path.join(DIST, directory), { recursive:true });
+  }
   await mkdir(path.join(DIST, 'translation'), { recursive: true });
   for (const name of await readdir(path.join(SRC, 'translation'))) {
     if (name.endsWith('.js')) await copyFile(path.join(SRC, 'translation', name), path.join(DIST, 'translation', name));
@@ -153,7 +169,7 @@ async function main() {
   const graph = buildGraph(ROOT, entries);
 
   if (graph.external.size) {
-    console.error('[build] 内容脚本中出现裸模块导入（本工程禁止任何依赖）:');
+    console.error('[build] 内容脚本中出现裸模块导入（请使用工程内的相对路径模块）:');
     for (const [spec, files] of graph.external) {
       console.error(`  - ${spec}  ←  ${[...files].join(', ')}`);
     }

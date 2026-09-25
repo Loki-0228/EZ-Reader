@@ -88,6 +88,26 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await sh("sh.querySelector('.ezr-btn-dock').click();");
     await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock toggle failed in the reader view');
     check('阅读视图切到下边栏后工具栏位于正文下方，正文不被压住',await sh("const bar=sh.querySelector('.ezr-toolbar').getBoundingClientRect(),body=sh.querySelector('.ezr-body').getBoundingClientRect();return Math.abs(bar.top-body.bottom)<=1 && Math.abs(bar.bottom-innerHeight)<=1 && body.height>0;"));
+    // Opening the full-translation bar inserts a sibling into .ezr-root ahead of .ezr-body.
+    // Every later settings change re-runs mount.setDock(), so the toolbar must keep the top edge
+    // instead of being re-inserted below that bar.
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='top';"),'Dock toggle did not restore the top edge before the translation check');
+    await sh("sh.querySelector('.ezr-btn-translation').click();");
+    await until(()=>sh("return !sh.querySelector('.ezr-full-bar').hidden;"),'Full translation bar did not open');
+    await sh("sh.querySelector('.ezr-zoom-in').click();");
+    await until(()=>sh("return sh.querySelector('.ezr-zoom-label').textContent!=='100%';"),'Zoom-in did not change the zoom level');
+    check('全文翻译条打开后缩放不把主工具栏挤到该条下方',await sh("const toolbar=sh.querySelector('.ezr-toolbar').getBoundingClientRect(),full=sh.querySelector('.ezr-full-bar').getBoundingClientRect();return toolbar.top<=1 && toolbar.bottom<=full.top+1 && sh.querySelector('.ezr-toolbar').compareDocumentPosition(sh.querySelector('.ezr-full-bar'))===4;"));
+    await sh("sh.querySelector('.ezr-toggle-caps').click();");
+    await until(()=>sh("return sh.querySelector('.ezr-toggle-caps').getAttribute('aria-pressed')==='true';"),'Capitalize toggle did not apply');
+    check('切换大写首字母后主工具栏仍留在窗口顶部',await sh("const toolbar=sh.querySelector('.ezr-toolbar').getBoundingClientRect(),full=sh.querySelector('.ezr-full-bar').getBoundingClientRect();return toolbar.top<=1 && toolbar.bottom<=full.top+1;"));
+    await sh("sh.querySelector('.ezr-toggle-caps').click();");
+    await sh("sh.querySelector('.ezr-full-close').click();");
+    check('收起全文翻译条后工具栏仍在窗口顶部',await sh("const toolbar=sh.querySelector('.ezr-toolbar').getBoundingClientRect();return toolbar.top<=1 && sh.querySelector('.ezr-full-bar').hidden;"));
+    // Restore the bottom dock and the automatic zoom the later checks expect.
+    await sh("sh.querySelector('.ezr-zoom-fit').click();");
+    await sh("sh.querySelector('.ezr-btn-dock').click();");
+    await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock was not restored to the bottom for the navigation checks');
     await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:true})");
     check('重复打开工具栏保持当前阅读视图且不重复挂载',await sh("return !sh.host.hasAttribute('data-ezr-original') && document.querySelectorAll('#ezr-root').length===1 && sh.querySelectorAll('.ezr-toolbar').length===1;"));
     await sh("sh.querySelector('.ezr-btn-pick').click();");

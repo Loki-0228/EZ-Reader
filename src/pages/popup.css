@@ -83,3 +83,6 @@ button:disabled { opacity: .55; cursor: default; }
     --notice: #e8bb86;
   }
 }
+
+button.secondary { margin-top:10px; background:var(--mark-bg); color:var(--mark-fg); font-size:15px; padding:13px 18px; }
+button.secondary:hover:not(:disabled) { background:color-mix(in srgb,var(--mark-fg) 12%,var(--mark-bg)); }
