@@ -4,6 +4,7 @@
 
 # Dependencies and local configuration
 /node_modules/
+/.dsh/
 .env
 .env.*
 !.env.example

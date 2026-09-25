@@ -265,6 +265,16 @@ export function readerCss() {
 .ezr-zoom-label { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
 .ezr-toolbar :focus-visible { outline: 2px solid var(--ezr-accent); outline-offset: 2px; }
 
+.ezr-toolbar[hidden] { display:none!important; }
+.ezr-toolbar { display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0, 1fr) 32px; align-items:start; gap:12px; padding:10px 16px; }
+.ezr-title-chip { max-width:none; min-width:0; align-self:center; }
+.ezr-toolbar .ezr-reading-pdf .ezr-btn-original {border-right:0;border-radius:7px;}
+.ezr-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.ezr-toolbar .ezr-btn-translation[aria-expanded="true"] { color:var(--ezr-accent); border-color:var(--ezr-accent); background:color-mix(in srgb,var(--ezr-accent) 7%,var(--ezr-bg)); }
+.ezr-toolbar .ezr-toolbar-close, .ezr-full-bar .ezr-toolbar-close { display:grid; place-items:center; width:32px; min-width:32px; height:30px; padding:0; color:var(--ezr-muted); border:0; background:transparent; border-radius:6px; cursor:pointer; }
+.ezr-toolbar .ezr-toolbar-close:hover, .ezr-full-bar .ezr-toolbar-close:hover { color:var(--ezr-fg); background:color-mix(in srgb,var(--ezr-fg) 7%,var(--ezr-bg)); }
+@media(max-width:760px) { .ezr-toolbar { grid-template-columns:minmax(0,1fr) 32px; } .ezr-title-chip { display:none; } }
+
 /* Settings is a separate drawer, outside the scrollable reading content. */
 .ezr-settings-backdrop { position: fixed; inset: 0; z-index: 2147483644; background: rgba(17, 24, 39, .22); }
 .ezr-settings[hidden], .ezr-settings [hidden], .ezr-settings-backdrop[hidden] { display: none !important; }
@@ -419,6 +429,58 @@ export function readerCss() {
 .ezr-translation .ezr-word-retry { margin-top: 12px; font-size: 12px; }
 .ezr-translation .ezr-word-actions button { padding: 5px 9px; font-size: 12px; }
 .ezr-translation .ezr-word-save { background: var(--ezr-accent); border-color: var(--ezr-accent); color: var(--ezr-accent-fg); }
+
+/* Free-form translation panel: draggable, so it can be moved off whatever it covers. */
+.ezr-text-translation {
+  position: fixed; z-index: 2147483642; width: 380px; max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px; border: 1px solid var(--ezr-border); border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.22); background: var(--ezr-bg); color: var(--ezr-fg);
+  font: 13px/1.6 'Segoe UI', 'Microsoft YaHei', sans-serif; text-align: left; overscroll-behavior: contain;
+}
+.ezr-text-translation[hidden] { display: none !important; }
+.ezr-text-translation > * { flex-shrink: 0; }
+.ezr-text-translation.is-dragging, .ezr-text-translation.is-dragging .ezr-text-head { cursor: grabbing; user-select: none; }
+.ezr-text-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: -4px -4px 0; padding: 4px; border-radius: 8px; cursor: grab; touch-action: none;
+}
+.ezr-text-title { font-weight: 600; }
+.ezr-text-translation .ezr-text-close {
+  flex: none; padding: 0 6px; border: 0; background: none; color: var(--ezr-muted);
+  font: 20px/1 sans-serif; cursor: pointer;
+}
+.ezr-text-translation .ezr-text-close:hover { background: none; color: var(--ezr-fg); }
+.ezr-text-controls { display:flex; flex-wrap:wrap; gap:8px; }
+.ezr-text-target-field { display:flex; flex:1; align-items:center; gap:6px; white-space:nowrap; }
+.ezr-text-field { display: flex; flex-direction: column; gap: 5px; }
+.ezr-text-caption { color: var(--ezr-muted); font-size: 11px; }
+.ezr-text-translation select, .ezr-text-translation textarea, .ezr-text-translation button {
+  border: 1px solid var(--ezr-border); border-radius: 7px;
+  background: var(--ezr-bg); color: var(--ezr-fg); font: inherit;
+}
+.ezr-text-controls select { flex: 1; min-width: 0; padding: 5px 8px; cursor: pointer; }
+.ezr-text-translation textarea { padding: 7px 9px; resize: vertical; min-height: 34px; }
+.ezr-text-input { min-height: 78px; }
+.ezr-text-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ezr-text-translation button { padding: 6px 12px; cursor: pointer; }
+.ezr-text-translation button:hover:not(:disabled) { background: color-mix(in srgb, var(--ezr-fg) 7%, var(--ezr-bg)); }
+.ezr-text-translation .ezr-text-run {
+  border-color: var(--ezr-accent); background: var(--ezr-accent); color: var(--ezr-accent-fg); font-weight: 600;
+}
+.ezr-text-translation .ezr-text-run:hover:not(:disabled) { background: color-mix(in srgb, var(--ezr-accent) 88%, #000); }
+.ezr-text-translation button:disabled { opacity: .5; cursor: not-allowed; }
+.ezr-text-translation :focus-visible { outline: 2px solid var(--ezr-accent); outline-offset: 2px; }
+.ezr-text-output {
+  min-height: 44px; max-height: 240px; overflow-y: auto; padding: 9px 10px;
+  border: 1px solid var(--ezr-border); border-radius: 8px;
+  background: color-mix(in srgb, var(--ezr-fg) 4%, var(--ezr-bg));
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
+}
+.ezr-text-output:empty::before { content: '译文会显示在这里'; color: var(--ezr-muted); }
+.ezr-text-status { min-height: 1em; color: var(--ezr-muted); font-size: 11px; }
+
 .ezr-settings :is(button, select, input):focus-visible { outline: 2px solid var(--ezr-accent); outline-offset: 3px; }
 @media (max-width: 420px) {
   .ezr-settings-head { padding: 22px 20px 18px; }
@@ -431,6 +493,7 @@ export function readerCss() {
 }
 
 @media print { .ezr-toolbar, .ezr-outline { display: none !important } }
+@media print { .ezr-text-translation { display: none !important } }
 
 /* The UI adds .ezr-theme-auto to the root when theme === 'auto'. */
 @media (prefers-color-scheme: dark) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTranslation, translationContextKey } from '../src/translation/config.js';
+import { normalizeTranslation, translationContextKey, MAX_STYLE_PROMPT } from '../src/translation/config.js';
 import { normalizeVocabulary } from '../src/translation/vocabulary.js';
 import { createTranslationService } from '../src/translation/service.js';
 import { createWordbook } from '../src/translation/wordbook.js';
@@ -30,6 +30,15 @@ test('preload, explanations, generated cards and saving are independent opt-ins'
   assert.equal(plain.explanations, false); assert.equal(plain.wordCards, true);
   assert.equal(normalizeTranslation({ level: 'invalid' }).level, 'B1');
   assert.equal(translationContextKey(defaults), translationContextKey({ ...defaults, provider: 'deepseek', preload: true, level: 'C2', wordCards: false }));
+});
+test('the style instruction is trimmed, bounded and part of the context key', () => {
+  assert.equal(normalizeTranslation().stylePrompt, '');
+  assert.equal(normalizeTranslation({ stylePrompt: '  口语化  ' }).stylePrompt, '口语化');
+  assert.equal(normalizeTranslation({ stylePrompt: 42 }).stylePrompt, '');
+  assert.equal(normalizeTranslation({ stylePrompt: 'x'.repeat(900) }).stylePrompt.length, MAX_STYLE_PROMPT);
+  const base = normalizeTranslation();
+  assert.notEqual(translationContextKey(base), translationContextKey({ ...base, stylePrompt: '口语化' }));
+  assert.equal(translationContextKey(base), translationContextKey({ ...base, provider: 'deepseek', preload: true }));
 });
 test('generated words are grounded, deduplicated and cannot invent original sentences', () => {
   const result = normalizeVocabulary(JSON.stringify({ words: [...words, { term: 'inancial', translation: '无效子串' },

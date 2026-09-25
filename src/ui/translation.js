@@ -1,6 +1,7 @@
 import { MAX_SELECTION, TRANSLATION_KEY, ENGLISH_LEVELS, normalizeTranslation, translationContextKey, sampleContext, languageName } from '../translation/config.js';
 import { isWordSelection, normalizeWordCard } from '../translation/word-card.js';
 import { downloadWordCards } from '../translation/card-download.js';
+import { readUserSelection } from '../dom/user-selection.js';
 
 /** Selection UI belongs only to the reader's shadow tree. No remote text is parsed as HTML. */
 export function createTranslation({ root, article, getDocument, doc = document, request = message => chrome.runtime.sendMessage(message),
@@ -69,8 +70,9 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     button.addEventListener('mousedown', event => event.preventDefault());
   }
   const clearRemote = () => { void request({ type: 'ezr:translation:clear' }).catch(() => {}); };
+  const selectionAllowed = range => !range || canSelect(range);
   const alive = (chosen, token) => !destroyed && token === serial && selected === chosen && chosen.url === doc.location.href
-    && prefs.enabled && root.isConnected && isActive() && canSelect(chosen.range);
+    && prefs.enabled && root.isConnected && isActive() && selectionAllowed(chosen.range);
   const exportable = () => mode !== 'original' && prefs.wordCards ? vocabulary.length ? vocabulary : currentCard ? [currentCard] : [] : [];
   function controls() {
     for (const [key, input] of Object.entries(toggles)) input.checked = prefs[key];
@@ -142,29 +144,20 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     if (destroyed || !prefs.enabled || selecting || !isActive() || !root.isConnected || shadow.querySelector('.ezr-settings.is-open')
       || (mode !== 'original' && shadow.host?.hasAttribute('data-ezr-original'))) return;
     if (doc.location.href !== lastUrl) { reset(); lastUrl = doc.location.href; }
-    const selection = mode === 'original' ? doc.getSelection() : shadow.getSelection?.() || doc.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-    if (!article.contains(selection.anchorNode) || !article.contains(selection.focusNode)) return;
-    if (!canSelect(selection.getRangeAt(0))) { close(); return; }
-    // Source-page CSS capitalization can affect Selection.toString(). Send the
-    // original text nodes so display preferences do not change translation/cache keys.
-    const text = mode === 'original' ? selection.getRangeAt(0).cloneContents().textContent.trim() : selection.toString().trim();
-    if (!text || text === dismissed) return;
-    const range = selection.getRangeAt(0);
-    if (text === selected?.text && selected.range?.startContainer === range.startContainer && selected.range?.startOffset === range.startOffset
-      && selected.range?.endContainer === range.endContainer && selected.range?.endOffset === range.endOffset) return;
-    const rect = range.getBoundingClientRect();
-    const node = selection.anchorNode.nodeType === 1 ? selection.anchorNode : selection.anchorNode.parentElement;
-    const block = node.closest(mode === 'original' ? 'p,h1,h2,h3,h4,h5,h6,li,td,div' : '[data-ezr-type]');
-    let nearby = block?.textContent || '';
-    if (block && nearby.length > 1500) {
-      const prefix = range.cloneRange();
-      prefix.selectNodeContents(block);
-      try { prefix.setEnd(selection.anchorNode, selection.anchorOffset); } catch { /* Fall back to paragraph start. */ }
-      const start = Math.max(0, prefix.toString().length - 500);
-      nearby = nearby.slice(start, start + 1500);
+    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel });
+    if (!snapshot) {
+      const active = shadow.activeElement || doc.activeElement;
+      const anchor = shadow.getSelection?.()?.anchorNode || doc.getSelection()?.anchorNode;
+      if (!panel.contains(active) && !panel.contains(anchor)) close();
+      return;
     }
-    selected = { text, nearby: nearby.slice(0, 1500), rect, url: doc.location.href, range: range.cloneRange() };
+    const { text, range, rect, nearby } = snapshot;
+    if (!selectionAllowed(range)) { close(); return; }
+    if (!text || text === dismissed) return;
+    if (text === selected?.text && selected.anchorNode === snapshot.anchorNode
+      && selected.range?.startOffset === range?.startOffset && selected.range?.endOffset === range?.endOffset
+      && selected.start === snapshot.start && selected.end === snapshot.end) return;
+    selected = { ...snapshot, text, nearby: nearby || text, rect, url: doc.location.href, range };
     serial++;
     panel.hidden = false;
     const word = isWordSelection(text);
@@ -185,7 +178,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
   }
   async function run(provider) {
     clearTimeout(preloadTimer);
-    if (!selected || selected.url !== doc.location.href || !isActive() || !canSelect(selected.range)) { close(); return; }
+    if (!selected || selected.url !== doc.location.href || !isActive() || !selectionAllowed(selected.range)) { close(); return; }
     const chosen = selected, token = ++serial;
     studyScope = '';
     const word = isWordSelection(chosen.text);
@@ -203,10 +196,11 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     detail.textContent = provider === 'deepseek' ? 'DeepSeek' : 'MyMemory · 免费翻译';
     position(chosen.rect);
     try {
-      const ir = getDocument();
-      if (!context) context = sampleContext(ir.blocks.map(block => block.text || '').join('\n\n'));
+      const ir = mode === 'original' ? { title:doc.title, blocks:[] } : getDocument() || { blocks:[] };
+      if (mode === 'original') context = chosen.nearby || chosen.text;
+      else if (!context) context = sampleContext((ir.blocks || []).map(block => block.text || '').join('\n\n')) || chosen.nearby || chosen.text;
       const payload = { provider, text: chosen.text, nearby: chosen.nearby,
-        view: getView() || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
+        view: (mode === 'original' ? null : getView()) || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
       const reply = await request({ type: 'ezr:translation:run', ...payload });
       if (!alive(chosen, token)) return;
       if (!reply?.ok) throw new Error(reply?.message || '翻译服务暂时无响应，请重试。');
@@ -237,7 +231,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
       if (!destroyed && token === serial) {
         free.disabled = deepseek.disabled = false;
         position(chosen.rect);
-        if (exportable().length && !learningBusy && onCards(exportable(), chosen.range)) close();
+        if (chosen.range && exportable().length && !learningBusy && onCards(exportable(), chosen.range)) close();
       }
     }
   }
@@ -333,7 +327,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     } finally {
       if (alive(chosen, token)) { learningBusy = false; controls(); save.disabled = exportButton.disabled = false; position(chosen.rect); }
     }
-    if (alive(chosen, token) && retry.hidden) { await autoSave(chosen, token); if (exportable().length) onCards(exportable(), chosen.range); }
+    if (alive(chosen, token) && retry.hidden) { await autoSave(chosen, token); if (chosen.range && exportable().length) onCards(exportable(), chosen.range); }
   }
   async function saveCards(automatic = false, token = serial) {
     const cards = exportable(), chosen = selected;
@@ -357,7 +351,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
       const result = await request({ type: 'ezr:translation:config' });
       if (!result?.ok || destroyed || pendingPreferences || revision !== configRevision) return;
       const next = normalizeTranslation(result.config), wasReady = ready;
-      const changed = JSON.stringify(next) !== JSON.stringify(prefs);
+      const changed = JSON.stringify({ ...next, textTarget:'' }) !== JSON.stringify({ ...prefs, textTarget:'' });
       if (translationContextKey(prefs) !== translationContextKey(next)) reset();
       else if (wasReady && changed) close();
       prefs = next; ready = true; controls();
@@ -406,6 +400,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
   article.addEventListener('pointerdown', event => { if (event.composedPath().includes(panel)) return; selecting = true; dismissed = ''; close(); dismissed = ''; }, { signal: abort.signal });
   doc.addEventListener('pointerup', () => { if (selecting) { selecting = false; clearTimeout(selectionTimer); selectionTimer = setTimeout(capture, 20); } }, { signal: abort.signal });
   article.addEventListener('pointerup', () => { selecting = false; clearTimeout(selectionTimer); selectionTimer = setTimeout(capture, 20); }, { signal: abort.signal });
+  for (const eventName of ['select', 'keyup']) doc.addEventListener(eventName, () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(capture, 80); }, { capture:true, signal:abort.signal });
   doc.addEventListener('selectionchange', () => {
     clearTimeout(selectionTimer);
     selectionTimer = setTimeout(capture, 180);
@@ -414,7 +409,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     if (!event.composedPath().includes(panel) && !event.composedPath().includes(article)) close();
   }, { capture: true, signal: abort.signal });
   doc.defaultView.addEventListener('resize', close, { signal: abort.signal });
-  article.parentElement.addEventListener('scroll', close, { passive: true, signal: abort.signal });
+  doc.addEventListener('scroll', close, { capture:true, passive:true, signal:abort.signal });
   void loadConfig();
   return { close, reset, get isOpen() { return !panel.hidden; }, destroy() {
     destroyed = true; close(); abort.abort(); clearTimeout(selectionTimer); panel.remove(); clearRemote();

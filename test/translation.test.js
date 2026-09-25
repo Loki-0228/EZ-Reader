@@ -120,3 +120,35 @@ test('long article sampling is bounded and includes the beginning and end', () =
   assert.ok(sampled.length <= MAX_CONTEXT);
   assert.ok(sampled.startsWith('BEGIN') && sampled.endsWith('END'));
 });
+test('the style instruction is appended to the translation prompt without replacing its rules', async () => {
+  const { service, calls } = fixture();
+  await service.translate(input(), { ...config, stylePrompt: '口语化一点，保留术语原词' }, key);
+  const send = calls.find(call => !call.body.response_format);
+  assert.equal(send.body.messages[0].role, 'system');
+  assert.ok(send.body.messages[0].content.includes('只负责将本次选中的文本翻译成指定目标语言'));
+  assert.ok(send.body.messages[0].content.includes('口语化一点，保留术语原词'));
+  assert.ok(!calls.some(call => JSON.stringify(call.body).includes('stylePrompt')));
+});
+test('an empty style instruction leaves the base prompt untouched', async () => {
+  const { service, calls } = fixture();
+  await service.translate(input(), config, key);
+  const send = calls.find(call => !call.body.response_format);
+  assert.ok(!send.body.messages[0].content.includes('补充风格要求'));
+});
+test('changing the style drops the cached translation and rebuilds the context', async () => {
+  const { service, calls } = fixture();
+  await service.translate(input(), config, key);
+  const before = calls.length;
+  const styled = await service.translate(input(), { ...config, stylePrompt: '更书面' }, key);
+  assert.equal(styled.cached, undefined);
+  assert.equal(styled.text, '银行');
+  // A fresh session: one context analysis plus one translation.
+  assert.equal(calls.length, before + 2);
+});
+test('free-form input skips article analysis even when selection translation is disabled', async () => {
+  const { service, calls } = fixture();
+  await service.translate(input({ freeform: true }), { ...config, enabled: false }, key);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.response_format, undefined);
+  assert.equal(calls[0].body.messages[0].role, 'system');
+});

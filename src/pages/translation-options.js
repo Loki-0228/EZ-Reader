@@ -19,7 +19,6 @@ function fill(id, pairs) {
 function render(reply) {
   revision++; dirty = false;
   current = reply.config;
-  byId('translation-enabled').checked = current.enabled;
   byId('translation-source').value = current.source;
   byId('translation-target').value = current.target;
   byId('translation-model').value = current.model;
@@ -65,7 +64,7 @@ byId('translation-word-cards').addEventListener('change', dependencies);
 byId('translation-explanations').addEventListener('change', dependencies);
 byId('translation-save').addEventListener('click', () => act(async () => {
   const message = { type: 'ezr:translation:save', config: {
-    enabled: byId('translation-enabled').checked, source: byId('translation-source').value,
+    source: byId('translation-source').value,
     target: byId('translation-target').value, model: byId('translation-model').value,
     provider: byId('translation-provider').value, preload: byId('translation-preload').checked,
     explanations: byId('translation-explanations').checked,
@@ -77,7 +76,7 @@ byId('translation-save').addEventListener('click', () => act(async () => {
   render(await call(message));
 }, '翻译设置已保存，已打开的阅读视图也会更新。'));
 byId('translation-remove-key').addEventListener('click', () => act(async () => {
-  render(await call({ type: 'ezr:translation:save', config: current, apiKey: '' }));
+  render(await call({ type: 'ezr:translation:save', apiKey: '' }));
 }, 'DeepSeek 密钥已删除。'));
 byId('translation-clear').addEventListener('click', () => act(async () => {
   await call({ type: 'ezr:translation:clear-all' });

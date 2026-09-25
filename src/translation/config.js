@@ -10,10 +10,12 @@ export const ENGLISH_LEVELS = Object.freeze([
   ['A1', 'A1 · 入门'], ['A2', 'A2 · 基础'], ['B1', 'B1 · 中级'],
   ['B2', 'B2 · 中高级'], ['C1', 'C1 · 高级'], ['C2', 'C2 · 熟练'],
 ]);
-export const TRANSLATION_DEFAULTS = Object.freeze({ enabled: true, source: 'auto', target: 'zh-CN', model: 'deepseek-flash',
-  provider: 'free', preload: false, explanations: true, wordCards: true, autoSave: false, level: 'B1' });
+export const TRANSLATION_DEFAULTS = Object.freeze({ enabled: true, source: 'auto', target: 'zh-CN', textTarget: 'zh-CN', model: 'deepseek-flash',
+  provider: 'free', preload: false, explanations: true, wordCards: true, autoSave: false, level: 'B1', stylePrompt: '' });
 export const MAX_SELECTION = 2000;
 export const MAX_CONTEXT = 12000;
+/** Upper bound for the user's translation-style instruction. */
+export const MAX_STYLE_PROMPT = 500;
 
 export function normalizeTranslation(raw = {}) {
   const valid = code => LANGUAGES.some(([value]) => code === value);
@@ -21,6 +23,7 @@ export function normalizeTranslation(raw = {}) {
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
     source: raw.source === 'auto' || valid(raw.source) ? raw.source : 'auto',
     target: valid(raw.target) ? raw.target : 'zh-CN',
+    textTarget: valid(raw.textTarget) ? raw.textTarget : valid(raw.target) ? raw.target : 'zh-CN',
     model: MODELS.includes(raw.model) ? raw.model : 'deepseek-flash',
     provider: raw.provider === 'deepseek' ? 'deepseek' : 'free',
     preload: raw.preload === true,
@@ -28,13 +31,19 @@ export function normalizeTranslation(raw = {}) {
     wordCards: typeof raw.wordCards === 'boolean' ? raw.wordCards : true,
     autoSave: raw.autoSave === true,
     level: ENGLISH_LEVELS.some(([value]) => raw.level === value) ? raw.level : 'B1',
+    stylePrompt: typeof raw.stylePrompt === 'string' ? raw.stylePrompt.trim().slice(0, MAX_STYLE_PROMPT) : '',
   };
 }
 
-/** UI preferences must not throw away an unchanged article's translation context. */
-export function translationContextKey(raw) {
+/**
+ * UI preferences must not throw away an unchanged article's translation context.
+ *
+ * The style instruction takes part in the key: translations produced under one
+ * style must not be reused after the user changes it.
+ */
+export function translationContextKey(raw, scope = 'reading') {
   const config = normalizeTranslation(raw);
-  return JSON.stringify([config.enabled, config.source, config.target, config.model]);
+  return JSON.stringify([config.source, scope === 'text' ? config.textTarget : config.target, config.model, config.stylePrompt]);
 }
 
 export function languageName(code) {

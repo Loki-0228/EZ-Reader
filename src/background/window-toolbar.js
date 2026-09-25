@@ -16,6 +16,7 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
     if (!state.configured || !Number.isInteger(tab.id) || tab.windowId !== state.windowId) return null;
     if (tab.url && !/^(https?|file):/.test(tab.url)) return null;
     const message = { type: 'ezr:toolbar-state', ...state };
+    void api.tabs.sendMessage(tab.id, { ...state, type:'ezr:frame-toolbar-state' }).catch(() => {});
     let reply = await send(tab.id, message);
     if (reply === null && state.enabled && allowInject) {
       const injected = await inject(tab.id);
@@ -26,7 +27,7 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
   async function target(message, sender) {
     if (sender.id !== api.runtime.id) throw new Error('不允许此来源操作工具栏。');
     if (sender.tab) {
-      if (sender.frameId) throw new Error('仅网页主框架可操作工具栏。');
+      if (sender.frameId && message.type !== 'ezr:window-toolbar:get') throw new Error('仅网页主框架可操作工具栏。');
       return api.tabs.get(sender.tab.id);
     }
     if (!sender.url?.startsWith(api.runtime.getURL('pages/'))) throw new Error('请从扩展面板打开工具栏。');
