@@ -18664,6 +18664,21 @@ class CanvasGraphics {
     return shadow(this, "isFontSubpixelAAEnabled", enabled);
   }
   showText(opIdx, glyphs) {
+    // EZ-Reader: suppress painting only; retain text advances and graphics state.
+    const visible = this.contentVisible;
+    if (this.textFilter && visible) {
+      const current = this.current;
+      const matrix = Util.transform(getCurrentTransform(this.ctx), current.textMatrix || IDENTITY_MATRIX);
+      const point = [current.x, current.y + current.textRise];
+      Util.applyTransform(point, matrix);
+      this.contentVisible = this.textFilter({ x:point[0], y:point[1],
+        text:glyphs.filter(glyph => typeof glyph !== "number").map(glyph => glyph.unicode || "").join(""),
+        color:current.fillColor, fontName:current.font?.name }) !== false;
+    }
+    try { this.ezrShowText(opIdx, glyphs); }
+    finally { this.contentVisible = visible; }
+  }
+  ezrShowText(opIdx, glyphs) {
     if (this.dependencyTracker) {
       this.dependencyTracker.recordDependencies(opIdx, Dependencies.showText).resetBBox(opIdx);
       if (this.current.textRenderingMode & TextRenderingMode.ADD_TO_PATH_FLAG) {
@@ -18747,7 +18762,7 @@ class CanvasGraphics {
         width += glyph.width;
       }
       const joinedChars = chars.join("");
-      ctx.fillText(joinedChars, 0, 0);
+      if (this.contentVisible) ctx.fillText(joinedChars, 0, 0);
       if (this.dependencyTracker !== null) {
         const measure = ctx.measureText(joinedChars);
         this.dependencyTracker.recordBBox(opIdx, this.ctx, -measure.actualBoundingBoxLeft, measure.actualBoundingBoxRight, -measure.actualBoundingBoxAscent, measure.actualBoundingBoxDescent).recordShowTextOperation(opIdx);
@@ -22403,7 +22418,8 @@ class PDFPageProxy {
     isEditing = false,
     recordImages = false,
     recordOperations = false,
-    operationsFilter = null
+    operationsFilter = null,
+    textFilter = null
   }) {
     this._stats?.time("Overall");
     const intentArgs = this._transport.getRenderingIntent(intent, annotationMode, printAnnotationStorage, isEditing);
@@ -22485,7 +22501,8 @@ class PDFPageProxy {
         imagesTracker: shouldRecordImages ? new CanvasImagesTracker(canvas) : null,
         viewport,
         transform,
-        background
+        background,
+        textFilter
       },
       objs: this.objs,
       commonObjs: this.commonObjs,
@@ -23678,6 +23695,7 @@ class InternalRenderTask {
     this.gfx = new CanvasGraphics(canvasContext, this.commonObjs, this.objs, this.canvasFactory, this.filterFactory, {
       optionalContentConfig
     }, this.annotationCanvasMap, this.pageColors, dependencyTracker, imagesTracker);
+    this.gfx.textFilter = this.params.textFilter;
     this.gfx.beginDrawing({
       transform,
       viewport,

@@ -77,6 +77,7 @@ test('DEFAULT_SETTINGS is frozen and exactly as specified', () => {
     theme: 'light',
     showOutline: false,
     toolbarDock: 'top',
+    translationToolbarDock: 'top',
     rememberPerSite: true,
     restorePosition: true,
   });

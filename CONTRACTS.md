@@ -102,7 +102,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // 外观
   theme: 'light',          // 'light' | 'sepia' | 'dark' | 'auto'
   showOutline: false,
-  toolbarDock: 'top',      // 'top' | 'bottom'：工具栏所停靠的窗口边缘
+  toolbarDock: 'top',      // 'top' | 'bottom'：阅读工具栏停靠边缘
+  translationToolbarDock: 'top', // 'top' | 'bottom'：翻译工具栏独立停靠边缘
   // 行为
   rememberPerSite: true,
   restorePosition: true,
@@ -282,7 +283,7 @@ export function cssVarsFor(settings)
 - 不得出现任何远程 `url(...)`/`@import`/`@font-face` 网络引用。
 - `--ezr-scale` 用于 `.ezr-article { zoom: var(--ezr-scale) }` 或等价的 transform。
 - 工具栏“适配”切换到 `fit-width`：按阅读窗口可用宽度与设计列宽之比计算缩放倍率，支持宽屏放大，范围为 0.6–2.5；显示的百分比必须与实际文字缩放保持同步。正文保留内边距；当倍率未达到上限时，正文列宽应等于窗口可用宽度。
-- 工具栏的停靠边由宿主 `#ezr-root` 上的 `data-ezr-dock`（`'top'` / `'bottom'`）决定。取值为 `bottom` 时，`:host` 必须锚定到窗口底部（`:host([data-ezr-original][data-ezr-dock="bottom"]) { top: auto !important; bottom: 0 !important; }`），工具栏分隔线翻至上侧，`.ezr-toolbar-host` 的阴影翻向上方。
+- 阅读与翻译工具栏分别使用 `toolbarDock`、`translationToolbarDock`，宿主属性为 `data-ezr-dock`、`data-ezr-translation-dock`。两个稳定的 `.ezr-toolbar-host` 分别放入顶部或底部 `.ezr-toolbar-slot`，同侧时阅读栏在前。原网页模式的宿主覆盖视口并穿透指针事件，仅可见工具栏和交互浮层接收事件；简洁阅读的正文占据两侧工具栏之间的剩余空间。底部工具栏的分隔线与阴影翻向上方。
 
 ## 14. 存储契约（`chrome.storage.local`）
 
@@ -356,7 +357,7 @@ export function cssVarsFor(settings)
 - `background/window-toolbar.js` 在可信后台以 `chrome.storage.session['ezr:toolbar:window:'+windowId]` 保存 enabled/revision。窗口内更新串行化，广播限定该窗口，可信 sender 决定窗口，不接受网页自报 windowId 或 tabId 越权。主框架内容脚本启动时查询；标签页激活、导航和跨窗口移动时同步；窗口关闭删除状态。保持 session 默认的可信上下文访问级别。
 - 内容脚本按窗口标识与 revision 忽略过期状态，异步挂载用 lifecycle 防止关闭后被迟到初始化重新打开。换页后重建原网页工具栏；已有同页阅读视图在重复打开时保持不变。主工具栏的 × 仅隐藏当前页主栏，保留阅读会话、翻译工具和框架划词。相同 revision 的窗口同步不重新显示主栏；用户从扩展面板显式打开产生新 revision 后才恢复主栏。页面受浏览器限制无法注入时显示可操作提示。
 - Esc 键优先退出划词、设置与选区状态；在简洁阅读模式下按 Esc 退回原网页，在原网页模式下则保留工具栏。主栏和翻译栏的关闭图标只控制各自可见性，不结束窗口内的翻译支持。调试接口 open/close 用于创建与清理局部非持久会话，不改变窗口状态。
-- 工具栏按钮区域的末端是停靠切换按钮（`.ezr-btn-dock`），最右侧另设灰色关闭图标，两种视图均可用，可在 `toolbarDock` 的 `top` 与 `bottom` 之间切换：设为 `bottom` 时，工具栏贴住窗口底部，原网页模式下不再遮挡页面顶部。`mount()` 中的 `setDock()` 会改写宿主属性 `data-ezr-dock`，并使 DOM 顺序与视觉顺序保持一致，正文滚动容器的引用保持不变。停靠边属于工具栏自身的属性，而非站点显示偏好，因此固定写入共享默认设置、对所有站点生效，且不写入 `byOrigin`；按钮文案、`title` 与 `aria-pressed` 均跟随当前停靠边。
+- 两栏右侧的 `.ezr-toolbar-end` 固定排列另一工具栏入口、停靠按钮、灰色关闭图标，停靠按钮紧挨关闭图标左侧。停靠按钮与关闭图标一样是无边框图标按钮，不画边框方块。停靠按钮使用横线加箭头 SVG；顶部显示移到底部，底部显示移到顶部，图标、`title` 和无障碍名称同步变化。`mount().setDock()` 只移动阅读栏，`setTranslationDock()` 只移动翻译栏，正文滚动容器引用不变。停靠位置分别写入共享默认设置，不受 `byOrigin` 覆盖；仅停靠变化时跳过正文重绘，保留选区、译文节点和在途请求。
 
 ## 文档阅读与选区读取
 
@@ -370,11 +371,15 @@ export function cssVarsFor(settings)
 
 ## 统一翻译工具栏
 
-- 主工具栏仅有一个翻译入口，展开或收起子工具栏。输入文字入口移到翻译栏，复用原有输入浮窗；划词 enabled 开关也只在翻译栏展示。
+- 主栏「翻译工具」与翻译栏「阅读工具」常驻在各自停靠按钮左侧，点击仅显示另一栏，已显示时保持原状，`aria-expanded` 反映对方显示状态。输入文字入口和划词 enabled 开关在翻译栏展示。
 - 全文翻译与显示原文为同一按钮的互斥状态，停止或切回原文后保留已完成缓存。关闭划词不清除全文缓存，不影响输入/全文翻译。选中译文也可显示浮窗，不读取密码输入。
-- 两栏共享标题列宽、按钮起点、30px 控件高度及最右侧灰色 SVG 关闭按钮。子工具栏放在同一 toolbarHost 内，随主工具栏一起停靠。
+- 两栏共享标题列宽、按钮起点、30px 控件高度及最右侧灰色 SVG 关闭按钮。各自使用独立 toolbarHost 停靠；窄屏时右侧动作组保持可见，主体控件换行。PDF 视口分别观察上下停靠容器的实际高度并预留空间。
 - PDF 入口由 popup 直接调用共享 openPdfForTab/createPdfEntry 创建视图，文档页直接读取受信任 session 数据，不把缺失后台响应作为打开页面的前置条件。原生 PDF 通过该扩展视图提供浮窗；网页 PDF 控件由帧内内容脚本读取选区。
-- PDF 页仅允许 __ezr.setPdfDocument 注入受限文本数据构建阅读 IR；全文翻译不改动 PDF canvas/文本层。PPT/PPTX 解析及其依赖从本版移除。
+- PDF 页仅允许 __ezr.setPdfDocument 注入受限文本数据构建阅读 IR；全文翻译通过受信任文档页的 __ezrPdfTranslation 适配器替换原页文字，不自动切换阅读模式。PPT/PPTX 源文件解析不在支持范围内，但支持它们导出的带文字层 PDF。
+- src/documents/layout.js 按字形坐标构建文本框，返回原点、旋转角、宽高、字号和完整文字。fitText 先压缩行距，再缩小字号，不截断文字或设置裁切；行距至少容纳测量到的字形高度。
+- src/documents/translation.js 提供 prepare/apply/restore/reset/exportPreview。prepare 返回带 id/source 的文本框；apply 接收完整的已完成结果列表 [{id,text}]，未完成位置仍显示原文。不同文件必须 reset，语言和服务变更必须 restore。
+- PDF.js 的本地 textFilter 绘制钩子只抑制目标文字的绘制，保留文字推进和图形状态；tools/pdfjs-text-filter.js 在固定版本重新下载时重放该补丁，匹配失败须报错。
+- 导出预览逐页使用相同排版，按原页尺寸打印为 PDF。译文保留为文字，图形和未翻译内容栅格化；不能把导出描述为保留原始 PDF 对象或矢量结构。
 
 ## 翻译目标语言与工具栏独立关闭
 

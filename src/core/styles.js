@@ -93,34 +93,28 @@ export function readerCss() {
   text-rendering: optimizeLegibility;
 }
 
-.ezr-toolbar-host {
-  flex: none;
-  position: relative;
-  z-index: 2;
+.ezr-toolbar-slot {
+  flex: none; position: relative; z-index: 2; min-width: 0;
   box-shadow: 0 4px 14px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.12);
 }
+.ezr-toolbar-slot-bottom { box-shadow: 0 -4px 14px rgba(0,0,0,.18), 0 -1px 3px rgba(0,0,0,.12); }
+.ezr-toolbar-slot:not(:has(.ezr-toolbar:not([hidden]), .ezr-full-bar:not([hidden]))) { display: none; }
+.ezr-toolbar-host { min-width: 0; }
 .ezr-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 
-/* Original-page mode retains only the return toolbar, so the page is clickable. */
-:host([data-ezr-original]) { bottom: auto !important; }
-:host([data-ezr-original]) .ezr-root {
-  height: auto;
-  box-shadow: 0 6px 20px rgba(0,0,0,.2), 0 1px 4px rgba(0,0,0,.14);
-}
+/* Original pages remain interactive between the independently docked bars. */
+:host([data-ezr-original]) { pointer-events: none !important; }
+:host([data-ezr-original]) .ezr-root { background: transparent; pointer-events: none; }
 :host([data-ezr-original]) .ezr-body { display: none; }
-
-/* Bottom dock: the toolbar sits flush with the viewport bottom, so its border and shadow are inverted. */
-:host([data-ezr-dock="bottom"]) .ezr-toolbar-host {
-  box-shadow: 0 -4px 14px rgba(0,0,0,.18), 0 -1px 3px rgba(0,0,0,.12);
-}
-:host([data-ezr-dock="bottom"]) .ezr-toolbar {
+:host([data-ezr-original]) .ezr-toolbar-slot { position: absolute; left: 0; right: 0; pointer-events: auto; }
+:host([data-ezr-original]) .ezr-toolbar-slot-top { top: 0; }
+:host([data-ezr-original]) .ezr-toolbar-slot-bottom { bottom: 0; }
+:host([data-ezr-original]) :is(.ezr-settings, .ezr-settings-backdrop, .ezr-text-translation, .ezr-original-selection) { pointer-events: auto; }
+.ezr-toolbar-host[data-ezr-dock="bottom"] .ezr-toolbar {
   border-bottom: 0;
   border-top: 2px solid color-mix(in srgb, var(--ezr-fg) 24%, var(--ezr-bg));
 }
-:host([data-ezr-original][data-ezr-dock="bottom"]) { top: auto !important; bottom: 0 !important; }
-:host([data-ezr-original][data-ezr-dock="bottom"]) .ezr-root {
-  box-shadow: 0 -6px 20px rgba(0,0,0,.2), 0 -1px 4px rgba(0,0,0,.14);
-}
+.ezr-toolbar-host[data-ezr-dock="bottom"] .ezr-full-bar { border-bottom: 0; border-top: 1px solid var(--ezr-border); }
 
 .ezr-root *,
 .ezr-root *::before,
@@ -266,14 +260,27 @@ export function readerCss() {
 .ezr-toolbar :focus-visible { outline: 2px solid var(--ezr-accent); outline-offset: 2px; }
 
 .ezr-toolbar[hidden] { display:none!important; }
-.ezr-toolbar { display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0, 1fr) 32px; align-items:start; gap:12px; padding:10px 16px; }
+.ezr-toolbar { display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0, 1fr) auto; align-items:start; gap:12px; padding:10px 16px; }
 .ezr-title-chip { max-width:none; min-width:0; align-self:center; }
 .ezr-toolbar .ezr-reading-pdf .ezr-btn-original {border-right:0;border-radius:7px;}
 .ezr-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
-.ezr-toolbar .ezr-btn-translation[aria-expanded="true"] { color:var(--ezr-accent); border-color:var(--ezr-accent); background:color-mix(in srgb,var(--ezr-accent) 7%,var(--ezr-bg)); }
-.ezr-toolbar .ezr-toolbar-close, .ezr-full-bar .ezr-toolbar-close { display:grid; place-items:center; width:32px; min-width:32px; height:30px; padding:0; color:var(--ezr-muted); border:0; background:transparent; border-radius:6px; cursor:pointer; }
-.ezr-toolbar .ezr-toolbar-close:hover, .ezr-full-bar .ezr-toolbar-close:hover { color:var(--ezr-fg); background:color-mix(in srgb,var(--ezr-fg) 7%,var(--ezr-bg)); }
-@media(max-width:760px) { .ezr-toolbar { grid-template-columns:minmax(0,1fr) 32px; } .ezr-title-chip { display:none; } }
+.ezr-toolbar .ezr-btn-translation[aria-expanded="true"], .ezr-full-bar .ezr-full-reader-tools[aria-expanded="true"] { color:var(--ezr-accent); border-color:var(--ezr-accent); background:color-mix(in srgb,var(--ezr-accent) 7%,var(--ezr-bg)); }
+/* The dock toggle and the close icon are frameless icon buttons; only their hover tint draws anything. */
+.ezr-toolbar .ezr-toolbar-close, .ezr-full-bar .ezr-toolbar-close,
+.ezr-toolbar .ezr-toolbar-dock, .ezr-full-bar .ezr-toolbar-dock { display:grid; place-items:center; width:32px; min-width:32px; height:30px; padding:0; color:var(--ezr-muted); border:0; background:transparent; border-radius:6px; cursor:pointer; }
+.ezr-toolbar .ezr-toolbar-close:hover, .ezr-full-bar .ezr-toolbar-close:hover,
+.ezr-toolbar .ezr-toolbar-dock:hover, .ezr-full-bar .ezr-toolbar-dock:hover { color:var(--ezr-fg); background:color-mix(in srgb,var(--ezr-fg) 7%,var(--ezr-bg)); }
+.ezr-toolbar-end { display: inline-flex; align-items: center; justify-self: end; gap: 8px; white-space: nowrap; }
+.ezr-toolbar-dock svg { display: block; }
+.ezr-toolbar-actions > * { max-width: 100%; }
+.ezr-font-field { min-width: 0; }
+.ezr-font-select { min-width: 0; max-width: 100%; }
+@media(max-width:760px) { .ezr-toolbar { grid-template-columns:minmax(0,1fr) auto; } .ezr-title-chip { display:none; } }
+@media(max-width:520px) {
+  .ezr-toolbar { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .ezr-toolbar-end { grid-column:1; grid-row:1; }
+  .ezr-toolbar-actions { grid-column:1; grid-row:2; }
+}
 
 /* Settings is a separate drawer, outside the scrollable reading content. */
 .ezr-settings-backdrop { position: fixed; inset: 0; z-index: 2147483644; background: rgba(17, 24, 39, .22); }

@@ -6,6 +6,7 @@
 import { FONT_FAMILIES } from '../core/constants.js';
 import { getDoc } from '../dom/env.js';
 import { closeIcon } from './close-icon.js';
+import { dockIcon } from './dock-icon.js';
 
 /** 标题碎片最大字符数。 */
 const TITLE_MAX = 40;
@@ -47,6 +48,7 @@ export function createToolbar(container, opts = {}) {
 
   const bar = doc.createElement('div');
   bar.className = 'ezr-toolbar';
+  bar.id = 'ezr-reading-bar';
   bar.setAttribute('role', 'toolbar');
   bar.setAttribute('aria-label', '阅读工具栏');
 
@@ -146,10 +148,9 @@ export function createToolbar(container, opts = {}) {
   bar.appendChild(makeButton('大纲', '显示或隐藏文章大纲', () => fire(opts.onToggleOutline), 'ezr-btn-outline'));
   const pickBtn = makeButton('选择区域', '在原网页选择要阅读的区域', () => fire(opts.onPickRegion), 'ezr-btn-pick');
   bar.appendChild(makeButton('设置', '打开设置', () => fire(opts.onOpenSettings), 'ezr-btn-settings'));
-  const translationBtn = makeButton('翻译工具', '展开或收起翻译工具栏', () => fire(opts.onFullTranslation), 'ezr-btn-translation');
+  const translationBtn = makeButton('翻译工具', '显示翻译工具栏', () => fire(opts.onFullTranslation), 'ezr-btn-translation');
   translationBtn.setAttribute('aria-expanded', 'false');
   translationBtn.setAttribute('aria-controls', 'ezr-translation-bar');
-  bar.appendChild(translationBtn);
   const originalBtn = makeButton('原网页', '查看原网页排版，可使用全文翻译', () => fire(opts.onOpenOriginal), 'ezr-btn-original');
   originalBtn.setAttribute('aria-pressed', 'false');
   const readingGroup = doc.createElement('div');
@@ -160,18 +161,21 @@ export function createToolbar(container, opts = {}) {
   const close = makeButton('', '关闭主工具栏', () => fire(opts.onClose), 'ezr-btn-close ezr-toolbar-close');
   close.appendChild(closeIcon(doc));
 
-  // 6) 停靠按钮位于按钮组末端，关闭图标独立放在最右侧。
-  const dockBtn = makeButton('移到底部', '把工具栏停靠到窗口底部', () => {
+  // The dock toggle sits immediately left of the close icon; the opposite toolbar's entry precedes it.
+  const dockBtn = makeButton('', '把阅读工具栏移到窗口底部', () => {
     fire(opts.onToggleDock, dockOf(current) === 'bottom' ? 'top' : 'bottom');
-  }, 'ezr-btn-dock');
+  }, 'ezr-btn-dock ezr-toolbar-dock');
   dockBtn.setAttribute('aria-pressed', 'false');
-  bar.appendChild(dockBtn);
+  dockBtn.dataset.target = 'bottom';
+  dockBtn.appendChild(dockIcon(doc, 'bottom'));
+  const end = doc.createElement('div'); end.className = 'ezr-toolbar-end';
+  end.append(translationBtn, dockBtn, close);
 
   bar.insertBefore(readingGroup, zoomGroup);
 
   const actions = doc.createElement('div'); actions.className = 'ezr-toolbar-actions';
   for (const child of [...bar.children]) if (child !== titleChip) actions.appendChild(child);
-  bar.append(actions, close);
+  bar.append(actions, end);
   container.appendChild(bar);
 
   /**
@@ -198,8 +202,12 @@ export function createToolbar(container, opts = {}) {
     capsBtn.setAttribute('aria-pressed', capsOn ? 'true' : 'false');
     capsBtn.classList.toggle('is-on', capsOn);
     const atBottom = dockOf(settings) === 'bottom';
-    const dockLabel = atBottom ? '把工具栏停靠到窗口顶部' : '把工具栏停靠到窗口底部';
-    dockBtn.textContent = atBottom ? '移到顶部' : '移到底部';
+    const destination = atBottom ? 'top' : 'bottom';
+    const dockLabel = atBottom ? '把阅读工具栏移到窗口顶部' : '把阅读工具栏移到窗口底部';
+    if (dockBtn.dataset.target !== destination) {
+      dockBtn.replaceChildren(dockIcon(doc, destination));
+      dockBtn.dataset.target = destination;
+    }
     dockBtn.setAttribute('aria-label', dockLabel);
     dockBtn.setAttribute('title', dockLabel);
     dockBtn.setAttribute('aria-pressed', String(atBottom));

@@ -117,8 +117,8 @@ function ensureHost(doc, previous) {
  * 挂载阅读器外壳。
  * @param {{doc?: Document, settings?: Object, onClose?: Function}} [opts] 选项。
  * @returns {{host: Element, shadow: ShadowRoot, root: HTMLElement, article: HTMLElement,
- *   toolbarHost: HTMLElement, outlineHost: HTMLElement, toastHost: HTMLElement,
- *   setDock: (dock: unknown) => ('top'|'bottom'),
+ *   toolbarHost: HTMLElement, translationToolbarHost: HTMLElement, outlineHost: HTMLElement, toastHost: HTMLElement,
+ *   setDock: (dock: unknown) => ('top'|'bottom'), setTranslationDock: (dock: unknown) => ('top'|'bottom'),
  *   onClose: (Function|undefined), destroy: () => void}} 句柄；`onClose` 为透传，便于调用方复用同一回调。
  */
 export function mount(opts = {}) {
@@ -161,7 +161,13 @@ export function mount(opts = {}) {
   root.className = 'ezr-root';
 
   const toolbarHost = doc.createElement('div');
-  toolbarHost.className = 'ezr-toolbar-host';
+  toolbarHost.className = 'ezr-toolbar-host ezr-reading-toolbar-host';
+  const translationToolbarHost = doc.createElement('div');
+  translationToolbarHost.className = 'ezr-toolbar-host ezr-translation-toolbar-host';
+  const topToolbarSlot = doc.createElement('div');
+  topToolbarSlot.className = 'ezr-toolbar-slot ezr-toolbar-slot-top';
+  const bottomToolbarSlot = doc.createElement('div');
+  bottomToolbarSlot.className = 'ezr-toolbar-slot ezr-toolbar-slot-bottom';
 
   const body = doc.createElement('div');
   body.className = 'ezr-body';
@@ -179,41 +185,34 @@ export function mount(opts = {}) {
 
   body.appendChild(outlineHost);
   body.appendChild(article);
-  root.appendChild(toolbarHost);
+  root.appendChild(topToolbarSlot);
   root.appendChild(body);
+  root.appendChild(bottomToolbarSlot);
   root.appendChild(toastHost);
   shadow.appendChild(root);
 
   applyVars(root, opts.settings ?? null);
 
-  /**
-   * 将工具栏移动到指定的窗口边缘。
-   * DOM 顺序与视觉顺序一致，使键盘 Tab 遍历顺序与停靠位置对应。
-   *
-   * 顶部停靠固定插到 `root` 的第一个子节点之前，而不是"`.ezr-body` 之前"：
-   * 其它面板（如全文翻译条）也会插在 `.ezr-body` 之前，若以 `.ezr-body` 为锚点，
-   * 工具栏会被排到那层面板下方。本函数在每次设置变更时都会执行，因此锚点必须
-   * 与这些面板无关，重复调用才能得到同样的结果。
-   * @param {unknown} dock `'top'` 或 `'bottom'`；其它值按 `'top'` 处理。
-   * @returns {'top'|'bottom'} 实际生效的停靠边。
-   */
-  const setDock = (dock) => {
+  // Stable hosts preserve each bar's state. Only the moved bar changes its slot;
+  // when both share an edge, reading controls precede translation controls.
+  const placeToolbar = (container, dock, attribute) => {
     const side = dock === 'bottom' ? 'bottom' : 'top';
-    try {
-      if (side === 'bottom') root.insertBefore(toolbarHost, toastHost);
-      else if (root.firstChild !== toolbarHost) root.insertBefore(toolbarHost, root.firstChild);
-    } catch {
-      /* 宿主结构异常时保持当前顺序 */
+    const slot = side === 'bottom' ? bottomToolbarSlot : topToolbarSlot;
+    if (container.parentNode !== slot) {
+      const focused = shadow.activeElement;
+      const restoreFocus = focused && container.contains(focused);
+      if (container === toolbarHost && translationToolbarHost.parentNode === slot) slot.insertBefore(container, translationToolbarHost);
+      else slot.appendChild(container);
+      if (restoreFocus) focused.focus({ preventScroll: true });
     }
-    try {
-      host.setAttribute('data-ezr-dock', side);
-    } catch {
-      /* 忽略 */
-    }
+    container.setAttribute('data-ezr-dock', side);
+    host.setAttribute(attribute, side);
     return side;
   };
-
-  setDock(opts.settings ? opts.settings.toolbarDock : 'top');
+  const setDock = dock => placeToolbar(toolbarHost, dock, 'data-ezr-dock');
+  const setTranslationDock = dock => placeToolbar(translationToolbarHost, dock, 'data-ezr-translation-dock');
+  setDock(opts.settings?.toolbarDock);
+  setTranslationDock(opts.settings?.translationToolbarDock);
 
   const controller = new AbortController();
   let destroyed = false;
@@ -248,9 +247,11 @@ export function mount(opts = {}) {
     root,
     article,
     toolbarHost,
+    translationToolbarHost,
     outlineHost,
     toastHost,
     setDock,
+    setTranslationDock,
     signal: controller.signal,
     onClose: opts.onClose,
     destroy,

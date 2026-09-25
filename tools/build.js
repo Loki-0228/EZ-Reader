@@ -66,6 +66,8 @@ const REQUIRED_OUTPUT = [
   'pages/document-reader.js',
   'pages/document-reader.css',
   'documents/parser.js',
+  'documents/layout.js',
+  'documents/translation.js',
   'vendor/pdfjs/pdf.mjs',
   'vendor/pdfjs/pdf.worker.mjs',
   'vendor/pdfjs/pdf_viewer.mjs',

@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   theme: 'light',
   showOutline: false,
   toolbarDock: 'top',
+  translationToolbarDock: 'top',
   // 行为
   rememberPerSite: true,
   restorePosition: true,

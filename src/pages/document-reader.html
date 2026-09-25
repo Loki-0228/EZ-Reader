@@ -11,6 +11,8 @@
     <label class="pdf-file-button">打开文件<input id="pdf-file" type="file" accept=".pdf,application/pdf"></label>
     <label>页码 <input id="pdf-page" type="number" value="1" min="1" aria-label="PDF 页码"><span id="pdf-total"></span></label>
     <button id="pdf-fit" type="button">适应宽度</button>
+    <button id="pdf-export" type="button" disabled title="翻译后导出 PDF">导出 PDF</button>
+    <span id="pdf-translation-count" role="status" aria-live="polite"></span>
     <button id="open-toolbar" type="button">工具栏</button>
     <button id="cancel-load" type="button" hidden>停止打开</button>
     <form id="source-form" hidden><label for="pdf-source">页面中的 PDF</label><select id="pdf-source"></select><button type="submit">打开 PDF</button></form>

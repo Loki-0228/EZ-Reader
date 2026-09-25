@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { patchPdfjsTextFilter } from './pdfjs-text-filter.js';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packages = [
   ['pdfjs-dist', '6.3.289', 'sha512-ZHjSVpDa3D6izMq8/04lvkhkATUmL9px6ChPaXc1k6nU2Mrhlg1/7F0bdUqCwUjw3NsPTfPZsMDUU6ZIcRaeQw=='],
@@ -29,6 +31,8 @@ for (const [name, version, integrity] of packages) {
   const to = path.join(root, 'src', 'vendor', name === 'pdfjs-dist' ? 'pdfjs' : name);
   await mkdir(to, { recursive: true });
   for (const file of ['pdf.mjs','pdf.worker.mjs']) await cp(path.join(from,'legacy','build',file),path.join(to,file));
+  const pdfPath = path.join(to,'pdf.mjs');
+  await writeFile(pdfPath,patchPdfjsTextFilter((await readFile(pdfPath,'utf8')).replace(/\r\n/g,'\n')));
   for (const file of ['pdf_viewer.mjs','pdf_viewer.css']) await cp(path.join(from,'legacy','web',file),path.join(to,file));
   for (const dir of ['cmaps','standard_fonts','wasm']) await cp(path.join(from,dir),path.join(to,dir),{recursive:true});
   await cp(path.join(from,'legacy','web','images'),path.join(to,'images'),{recursive:true});

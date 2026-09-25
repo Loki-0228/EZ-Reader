@@ -21,16 +21,18 @@ test('readerCss references no remote resource', () => {
   assert.equal(/@import|@font-face|url\(/i.test(css), false);
 });
 
-test('original-page mode keeps only the toolbar', () => {
-  assert.match(css, /:host\(\[data-ezr-original\]\) \{ bottom: auto !important; \}/);
+test('original-page mode keeps the bars and lets the page receive events', () => {
+  assert.match(css, /:host\(\[data-ezr-original\]\) \{ pointer-events: none !important; \}/);
   assert.match(css, /:host\(\[data-ezr-original\]\) \.ezr-body \{ display: none; \}/);
 });
 
-test('bottom dock anchors the host to the bottom edge', () => {
-  assert.match(css, /:host\(\[data-ezr-original\]\[data-ezr-dock="bottom"\]\) \{ top: auto !important; bottom: 0 !important; \}/);
+test('original-page mode pins the toolbar slots to both window edges', () => {
+  assert.match(css, /:host\(\[data-ezr-original\]\) \.ezr-toolbar-slot \{ position: absolute; left: 0; right: 0; pointer-events: auto; \}/);
+  assert.match(css, /:host\(\[data-ezr-original\]\) \.ezr-toolbar-slot-top \{ top: 0; \}/);
+  assert.match(css, /:host\(\[data-ezr-original\]\) \.ezr-toolbar-slot-bottom \{ bottom: 0; \}/);
 });
 
-test('bottom dock flips the toolbar rule and the toolbar shadow', () => {
-  assert.match(css, /:host\(\[data-ezr-dock="bottom"\]\) \.ezr-toolbar \{[^}]*border-bottom: 0;[^}]*border-top: 2px solid/);
-  assert.match(css, /:host\(\[data-ezr-dock="bottom"\]\) \.ezr-toolbar-host \{[^}]*box-shadow: 0 -4px 14px/);
+test('bottom dock flips the toolbar rule and the slot shadow', () => {
+  assert.match(css, /\.ezr-toolbar-host\[data-ezr-dock="bottom"\] \.ezr-toolbar \{[^}]*border-bottom: 0;[^}]*border-top: 2px solid/);
+  assert.match(css, /\.ezr-toolbar-slot-bottom \{ box-shadow: 0 -4px 14px/);
 });

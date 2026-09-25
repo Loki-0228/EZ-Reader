@@ -1,4 +1,5 @@
 import * as pdfjs from '../vendor/pdfjs/pdf.mjs';
+import { extractTextBoxes } from './layout.js';
 const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_PAGES = 1000;
 const MAX_TEXT = 2_000_000;
@@ -31,19 +32,10 @@ export async function extractPdfText(pdf, { name = 'PDF', signal, onProgress = (
   for (let number = 1; number <= pdf.numPages; number++) {
     signal?.throwIfAborted();
     const page = await pdf.getPage(number), content = await page.getTextContent();
-    const parts = []; let previous = null, length = 0;
-    for (const item of content.items) {
-      if (typeof item.str !== 'string') continue;
-      length += item.str.length + 1;
-      if (total + length > MAX_TEXT) throw new Error('PDF 文字超过 200 万字符，仍可阅读原文；全文翻译前请拆分文件。');
-      if (previous && parts.length && !parts.at(-1).endsWith('\n')) {
-        const dy = Math.abs((item.transform?.[5] || 0) - (previous.transform?.[5] || 0));
-        parts.push(dy > Math.max(2,(item.height || previous.height || 8) * .6) ? '\n' : ' ');
-      }
-      parts.push(item.str + (item.hasEOL ? '\n' : '')); previous = item;
-    }
-    const text = parts.join('').trim(); total += text.length;
-    pages.push({ title:'第 ' + number + ' 页', text });
+    const viewport = page.getViewport({ scale:1 }), boxes = extractTextBoxes(content,viewport);
+    const text = boxes.map(box => box.text).join('\n\n'); total += text.length;
+    if (total > MAX_TEXT) throw new Error('PDF 文字超过 200 万字符，仍可阅读原文；全文翻译前请拆分文件。');
+    pages.push({ number, title:'第 ' + number + ' 页', text, boxes, width:viewport.width, height:viewport.height });
     onProgress({ current:number, total:pdf.numPages });
     await new Promise(resolve => setTimeout(resolve,0));
   }

@@ -3,23 +3,25 @@ import assert from 'node:assert/strict';
 import { registerWindowToolbar } from '../src/background/window-toolbar.js';
 
 function fixture() {
-  const bag = {}, deliveries = [], injections = [], listeners = {};
+  const bag = {}, deliveries = [], injections = [], frames = [], listeners = {};
   const event = name => ({ addListener: callback => { listeners[name] = callback; } });
   const tabs = [{id:1,windowId:10,url:'https://example.com/a'},{id:2,windowId:10,url:'https://example.com/b'},
     {id:3,windowId:20,url:'https://example.com/c'},{id:4,windowId:10,url:'edge://settings'}];
   const api = { runtime:{id:'test',getURL:path=>'chrome-extension://test/'+path,onMessage:event('message')},
     storage:{session:{get:async key=>({[key]:bag[key]}),set:async values=>Object.assign(bag,values),remove:async key=>{delete bag[key];}}},
     tabs:{get:async id=>({...tabs.find(tab=>tab.id===id)}),query:async query=>tabs.filter(tab=>tab.windowId===query.windowId),
+      sendMessage:async (id,message)=>{frames.push({id,...message});return {ok:true};},
       onActivated:event('activate'),onUpdated:event('update'),onAttached:event('attach')},windows:{onRemoved:event('remove')} };
   const transport = {send:async (id,message)=>{deliveries.push({id,...message});return {ok:true};},inject:async id=>{injections.push(id);return {ok:true};}};
   const sender = {id:'test',tab:tabs[0],frameId:0};
-  return {bag,deliveries,injections,tabs,api,listeners,sender,transport,controller:registerWindowToolbar(api,transport)};
+  return {bag,deliveries,injections,frames,tabs,api,listeners,sender,transport,controller:registerWindowToolbar(api,transport)};
 }
 const set = (f, enabled, sender=f.sender) => f.controller.handle({type:'ezr:window-toolbar:set',enabled},sender);
 
 test('toolbar state and broadcasts are scoped to the trusted sender window',async()=>{
   const f=fixture(); await set(f,true);
   assert.deepEqual(f.deliveries.map(item=>item.id),[1,2]);
+  assert.deepEqual(f.frames.map(item=>[item.id,item.type]),[[1,'ezr:frame-toolbar-state'],[2,'ezr:frame-toolbar-state']]);
   assert.equal(f.bag['ezr:toolbar:window:10'].enabled,true);
   assert.equal(f.bag['ezr:toolbar:window:20'],undefined);
   const reloaded=registerWindowToolbar(f.api,f.transport);

@@ -113,7 +113,8 @@ function bootstrap() {
 
     async load() {
       await readPersisted.call(this);
-      this.resolved = normalizeSettings(resolveSettings(this.defaults, this.byOrigin, origin));
+      this.resolved = normalizeSettings({ ...resolveSettings(this.defaults, this.byOrigin, origin),
+        toolbarDock: this.defaults.toolbarDock, translationToolbarDock: this.defaults.translationToolbarDock });
       return this.resolved;
     },
 
@@ -159,12 +160,14 @@ function bootstrap() {
      * 停靠边属于工具栏自身属性，而非网站显示偏好，故固定写入共享默认值，
      * 对所有站点生效，不受 `rememberPerSite` 影响。
      * @param {'top'|'bottom'} dock 目标停靠边。
+     * @param {'reading'|'translation'} kind 要移动的工具栏。
      * @returns {Promise<Record<string, unknown>>} 更新后的生效设置。
      */
-    async setToolbarDock(dock) {
-      const next = normalizeSettings({ ...this.resolved, toolbarDock: dock });
+    async setToolbarDock(dock, kind = 'reading') {
+      const key = kind === 'translation' ? 'translationToolbarDock' : 'toolbarDock';
+      const next = normalizeSettings({ ...this.resolved, [key]: dock });
       this.resolved = next;
-      this.defaults = normalizeSettings({ ...this.defaults, toolbarDock: next.toolbarDock });
+      this.defaults = normalizeSettings({ ...this.defaults, [key]: next[key] });
       if (session) session.applySettings(next);
       await storage.write(storageKeyFor('', 'settings'), this.defaults);
       return next;
@@ -261,6 +264,7 @@ function bootstrap() {
     const toast = createToast(shell.toastHost, {});
 
     let currentDoc = irDoc;
+    let appliedSettings = { ...settings };
     let destroyed = false;
     let previewing = original;
     const documentUrl = doc.location.href;
@@ -334,7 +338,7 @@ function bootstrap() {
         settingsStore.update({ zoomMode: 'manual', zoom: next });
       },
       onOpenOriginal: () => setPreviewing(!previewing),
-      onFullTranslation: () => fullTranslation.toggle(),
+      onFullTranslation: () => fullTranslation.show(),
       onOpenSettings: () => {
         translation.close();
         fullTranslation.closeSelection();
@@ -422,13 +426,19 @@ function bootstrap() {
     paint(currentDoc, settings);
     toolbar.setPreviewing(previewing);
     originalCapitalization.setEnabled(!isDocumentReader && (previewing && settings.capitalizeFirst));
-    fullTranslation.bindReader({ root: shell.root, toolbarHost:shell.toolbarHost, isPdf:isDocumentReader, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close(),
+    fullTranslation.bindReader({ root: shell.root, toolbarHost:shell.toolbarHost, translationToolbarHost:shell.translationToolbarHost, isPdf:isDocumentReader, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close(),
       openTextTranslation: () => { translation.close(); fullTranslation.closeSelection(); settingsPanel.close(); textTranslation.toggle(); },
       onTranslationVisibility: value => toolbar.setTranslationOpen(value),
       isMainToolbarVisible: () => !toolbar.element.hidden,
+      getTranslationDock: () => settingsStore.get().translationToolbarDock,
+      setTranslationDock: dock => { void settingsStore.setToolbarDock(dock, 'translation'); },
       showMainToolbar: () => { toolbar.element.hidden = false; fullTranslation.mainToolbarChanged(); },
-      prepareTranslation: isDocumentReader ? async () => { if (!currentDoc.blocks.length) { const result = await open(); if (!result?.ok) throw new Error('PDF 文字尚未准备好，请稍后重试。'); } else setPreviewing(false); } : null,
-      showOriginal: isDocumentReader ? () => setPreviewing(true) : null });
+      get pdfTranslation() { return isDocumentReader ? globalThis.__ezrPdfTranslation : null; },
+      prepareTranslation: isDocumentReader ? async () => {
+        await globalThis.__ezrPreparePdf?.();
+        if (!pdfDocument) throw new Error('PDF 文字尚未准备好，请稍后重试。');
+        if (!destroyed && !currentDoc.blocks.length) session?.reload(doc.body,pdfDocument);
+      } : null });
     outline.setOpen(!!settings.showOutline);
     shell.outline.classList.toggle('is-open', !!settings.showOutline);
 
@@ -491,12 +501,19 @@ function bootstrap() {
       get previewing() { return previewing; },
       /** @param {object} nextSettings */
       applySettings(nextSettings) {
-        applyVars(shell.root, nextSettings);
+        const dockOnly = Object.keys(nextSettings).every(key =>
+          key === 'toolbarDock' || key === 'translationToolbarDock' || nextSettings[key] === appliedSettings[key]);
+        appliedSettings = { ...nextSettings };
         shell.setDock(nextSettings.toolbarDock);
+        shell.setTranslationDock(nextSettings.translationToolbarDock);
+        toolbar.update(nextSettings);
+        fullTranslation.mainToolbarChanged();
+        // Moving either bar preserves selections, translated nodes and pending requests.
+        if (dockOnly) return;
+        applyVars(shell.root, nextSettings);
         // applyVars seeds automatic zoom at 1. Preserve the measured scale while
         // recalculating: the watcher suppresses callbacks for unchanged results.
         shell.root.style.setProperty('--ezr-scale', String(zoomState.scale));
-        toolbar.update(nextSettings);
         toolbar.setZoom(zoomState.scale);
         settingsPanel.update(nextSettings);
         originalCapitalization.setEnabled(!isDocumentReader && (previewing && !activePicker && nextSettings.capitalizeFirst));
@@ -803,7 +820,7 @@ function bootstrap() {
         return startPick();
       case 'ezr:full-translation':
         if (!session) {
-          const result = await open();
+          const result = isDocumentReader ? await showToolbar() : await open();
           if (!result.ok) return { ...result, message: '未找到可阅读正文，请先用“选择区域”打开阅读器，再使用翻译。' };
         }
         fullTranslation.show();
@@ -850,14 +867,15 @@ function bootstrap() {
     close,
     setPdfDocument(parsed) {
       if (!isDocumentReader) return { ok:false };
-      if (!parsed) { pdfDocument = null; return { ok:true }; }
+      if (!parsed) { pdfDocument = null; fullTranslation.resetDocument(); return { ok:true }; }
       if (!Array.isArray(parsed.pages) || parsed.pages.length > 1000) throw new Error('PDF 页数超过限制。');
       const blocks = []; let chars = 0;
       for (const [index, page] of parsed.pages.entries()) {
         const text = String(page.text || ''); chars += text.length;
         if (chars > 2_000_000) throw new Error('PDF 文字超过限制，请拆分文件。');
         blocks.push({ type:'heading', level:2, text:String(page.title || '第 ' + (index + 1) + ' 页') });
-        if (text.trim()) blocks.push({ type:'para', text, lines:text.split(/\r?\n/) });
+        const texts = Array.isArray(page.boxes) ? page.boxes.map(box => String(box.text || '').replace(/\s+/gu,' ').trim()) : [text];
+        for (const value of texts) if (value.trim()) blocks.push({ type:'para', text:value, lines:value.split(/\r?\n/) });
       }
       pdfDocument = { title:String(parsed.title || doc.title), blocks, srcPath:null, truncated:false };
       return { ok:true };

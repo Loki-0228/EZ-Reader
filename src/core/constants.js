@@ -69,7 +69,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   // 外观
   theme: 'light',          // 'light' | 'sepia' | 'dark' | 'auto'
   showOutline: false,
-  toolbarDock: 'top',      // 'top' | 'bottom'：工具栏所停靠的窗口边缘
+  toolbarDock: 'top',      // 阅读工具栏停靠边缘
+  translationToolbarDock: 'top', // 翻译工具栏独立停靠边缘
   // 行为
   rememberPerSite: true,
   restorePosition: true,
