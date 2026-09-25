@@ -1,5 +1,5 @@
 /**
- * @file 阅读器工具栏：标题碎片、缩放段控、字体快捷选择、首字母大写开关与各功能按钮。
+ * @file 阅读器工具栏：工具栏名称、缩放段控、字体快捷选择、首字母大写开关与各功能按钮。
  * 只在自己的容器内构建与查询元素；文档级快捷键监听带 AbortController。
  */
 
@@ -8,25 +8,10 @@ import { getDoc } from '../dom/env.js';
 import { closeIcon } from './close-icon.js';
 import { dockIcon } from './dock-icon.js';
 
-/** 标题碎片最大字符数。 */
-const TITLE_MAX = 40;
-
-/**
- * 截断长文本。
- * @param {string} text 原文。
- * @param {number} max 最大长度。
- * @returns {string} 截断后的文本。
- */
-function truncate(text, max) {
-  const s = typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '';
-  if (s.length <= max) return s;
-  return `${s.slice(0, max)}…`;
-}
-
 /**
  * 创建工具栏。
  * @param {HTMLElement|ShadowRoot} container 渲染容器（工具栏会被 append 进去）。
- * @param {{settings?: Object, title?: string, doc?: Document, onToggleOutline?: Function,
+ * @param {{settings?: Object, doc?: Document, onToggleOutline?: Function,
  *   onPickRegion?: Function, onToggleCapitalize?: Function, onFit?: Function,
  *   onZoom?: (delta: number) => void, onOpenOriginal?: Function, onOpenSettings?: Function,
  *   onClose?: Function, onFontQuick?: (id: string) => void,
@@ -85,15 +70,12 @@ export function createToolbar(container, opts = {}) {
     }
   };
 
-  // 1) 标题碎片
+  // 1) 工具栏名称
   const titleChip = doc.createElement('span');
   titleChip.className = 'ezr-chip ezr-title-chip';
-  const fullTitle = typeof opts.title === 'string' && opts.title
-    ? opts.title
-    : (doc && typeof doc.title === 'string' ? doc.title : '');
-  titleChip.textContent = truncate(fullTitle, TITLE_MAX) || '阅读模式';
-  titleChip.setAttribute('title', fullTitle || '阅读模式');
-  titleChip.setAttribute('aria-label', `文档标题：${fullTitle || '未命名'}`);
+  titleChip.textContent = '文本沉浸';
+  titleChip.setAttribute('title', '文本沉浸');
+  titleChip.setAttribute('aria-label', '文本沉浸');
   bar.appendChild(titleChip);
 
   // 2) 缩放段控
