@@ -88,17 +88,27 @@ export function wrapText(text, width, measure) {
   return lines;
 }
 
+/** Wrap text inside the box width at a fixed font size. Leading follows the measured glyph ink. */
+function layoutAt(text, box, fontSize, leading, measureAtSize) {
+  const metrics = value => measureAtSize(value,fontSize);
+  const width = value => { const measured = metrics(value); return typeof measured === 'number' ? measured : measured.width; };
+  const lines = wrapText(text,box.width,width);
+  const inkHeight = lines.reduce((height,line) => Math.max(height,metrics(line)?.height || 0),0);
+  const lineHeight = Math.max(leading,inkHeight / fontSize + .04);
+  const height = lines.length * fontSize * lineHeight;
+  return { text, lines, fontSize, lineHeight, height,
+    fits:height <= box.height + .001 && lines.every(line => width(line) <= box.width + .001) };
+}
+
+/** User-chosen font size: rewrap inside the original width and adapt leading to the glyphs.
+ * Never shrinks or truncates — a box that cannot hold the text reports fits=false and overflows. */
+export function layoutManual(text, box, fontSize, measureAtSize) {
+  return layoutAt(text, box, fontSize, Math.max(1.05,box.lineHeight || 1.2), measureAtSize);
+}
+
 /** Never truncate, clamp or ellipsize. Tighten leading first, then binary-search font size. */
 export function fitText(text, box, measureAtSize) {
-  const layout = (fontSize, leading) => {
-    const metrics = value => measureAtSize(value,fontSize);
-    const width = value => { const measured = metrics(value); return typeof measured === 'number' ? measured : measured.width; };
-    const lines = wrapText(text,box.width,width);
-    const inkHeight = lines.reduce((height,line) => Math.max(height,metrics(line)?.height || 0),0);
-    const lineHeight = Math.max(leading,inkHeight / fontSize + .04);
-    return { text, lines, fontSize, lineHeight,
-      fits:lines.length * fontSize * lineHeight <= box.height + .001 && lines.every(line => width(line) <= box.width + .001) };
-  };
+  const layout = (fontSize, leading) => layoutAt(text, box, fontSize, leading, measureAtSize);
   const leading = Math.max(1.05,box.lineHeight || 1.2);
   const natural = layout(box.fontSize,leading);
   if (natural.fits) return natural;

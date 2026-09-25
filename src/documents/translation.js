@@ -1,4 +1,5 @@
-import { containsBaseline, fitText } from './layout.js';
+import { containsBaseline, fitText, layoutManual } from './layout.js';
+import { createPdfEditor } from './pdf-edit.js';
 
 const FONT = "'Segoe UI','Microsoft YaHei','Noto Sans',sans-serif";
 const canonical = text => text.replace(/\s+/gu,' ').trim();
@@ -10,12 +11,24 @@ export const PDF_TRANSLATION_CSS = `
 .ezr-pdf-text{position:absolute;box-sizing:content-box;margin:0;padding:0;border:0;transform-origin:0 0;white-space:pre;overflow:visible;pointer-events:auto;font-family:${FONT};text-align:start;text-transform:none;font-kerning:normal}
 .ezr-pdf-text span{display:block;white-space:pre}
 .ezr-pdf-translated .textLayer{visibility:hidden}
+.ezr-pdf-editing{cursor:crosshair;user-select:none;touch-action:none}
+.ezr-pdf-editing .ezr-pdf-text{cursor:pointer;outline:1px dashed var(--accent,#3c73cb);outline-offset:2px;user-select:none}
+.ezr-pdf-editing .ezr-pdf-text-selected{outline:2px solid var(--accent,#3c73cb);background:color-mix(in srgb,var(--accent,#3c73cb) 14%,transparent)}
+.ezr-pdf-editing .ezr-pdf-text:focus-visible{outline:3px solid var(--accent,#3c73cb)}
+.ezr-pdf-marquee{position:fixed;z-index:5;pointer-events:none;border:1px solid var(--accent,#3c73cb);background:color-mix(in srgb,var(--accent,#3c73cb) 14%,transparent)}
 `;
 
 /** Keep PDF graphics in place and replace only completed text boxes. */
-export function createPdfTranslation({ viewer, eventBus, container, getPdf, prepare, onError, onChange }) {
+export function createPdfTranslation({ viewer, eventBus, container, getPdf, prepare, onError, onChange, onEditChange }) {
   let parsed = null, groups = [], values = new Map(), revision = 0, generation = 0, timer = 0, busy = false;
-  const painted = new WeakMap(), renders = new Set();
+  const painted = new WeakMap(), renders = new Set(), fontSizes = new Map();
+  const editor = createPdfEditor({ container, onChange:state => {
+    const elements = [...container.querySelectorAll('.ezr-pdf-text')].filter(node => state.selected.includes(node.dataset.box));
+    const sizes = state.selected.map(id => fontSizes.get(id) ?? Number(elements.find(node => node.dataset.box === id)?.dataset.fontSize)).filter(Number.isFinite);
+    const mixed = sizes.some(size => Math.abs(size - sizes[0]) > .01);
+    onEditChange?.({ ...state, fontSize:mixed ? null : sizes[0] ?? null, mixed,
+      overflow:elements.filter(node => node.dataset.overflow === 'true').length });
+  } });
   const style = document.createElement('style'); style.textContent = PDF_TRANSLATION_CSS; document.head.appendChild(style);
 
   async function prepareGroups() {
@@ -31,9 +44,9 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     container.querySelectorAll('.ezr-pdf-overlay').forEach(layer => layer.remove());
     container.querySelectorAll('.ezr-pdf-translated').forEach(page => page.classList.remove('ezr-pdf-translated'));
   }
-  function restore() { revision++; values = new Map(); clearLayers(); onChange?.(0,groups.length); }
+  function restore() { editor.setAvailable(false); revision++; values = new Map(); clearLayers(); onChange?.(0,groups.length); }
   function reset() {
-    generation++; parsed = null; groups = []; restore();
+    generation++; parsed = null; groups = []; fontSizes.clear(); restore();
     for (const task of renders) task.cancel();
   }
   function apply(entries) {
@@ -41,7 +54,7 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     if (next.size === values.size && [...next].every(([id,text]) => values.get(id) === text)) return;
     values = next; revision++; onChange?.(values.size,groups.length); schedule();
   }
-  async function renderPage(pageModel, snapshot, scale = 2) {
+  async function renderPage(pageModel, snapshot, scale = 2, fontSnapshot = new Map(fontSizes), intent = 'display') {
     const token = generation, pdf = getPdf();
     if (!pdf) throw new Error('PDF 尚未打开。');
     const page = await pdf.getPage(pageModel.number);
@@ -52,7 +65,9 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
     const context = canvas.getContext('2d'), matched = new Set(), colors = new Map(), weights = new Map();
     const targets = pageModel.boxes.filter(box => snapshot.has(key(pageModel.number,box)));
-    const task = page.render({ canvasContext:context, viewport, annotationMode:0,
+    // Print intent keeps the operator-list loop on microtasks; display intent would stall
+    // inside requestAnimationFrame once the export window takes focus away from this page.
+    const task = page.render({ canvasContext:context, viewport, annotationMode:0, intent,
       textFilter(info) {
         if (!info.text.trim()) return true;
         const box = targets.find(box => containsBaseline(box,info.x / renderScale,info.y / renderScale));
@@ -76,13 +91,16 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
       const text = snapshot.get(key(pageModel.number,box));
       if (text === undefined) continue;
       const weight = weights.get(box.id) || (box.bold ? '700' : '400');
-      const layout = fitText(text,box,(value,size) => {
+      const measureAtSize = (value,size) => {
         measure.font = weight + ' ' + size + 'px ' + FONT;
         const metrics = measure.measureText(value);
         return { width:Math.max(metrics.width,metrics.actualBoundingBoxRight + Math.max(0,metrics.actualBoundingBoxLeft)) + size * .02,
           height:metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent };
-      });
+      };
+      const override = fontSnapshot.get(key(pageModel.number,box));
+      const layout = override === undefined ? fitText(text,box,measureAtSize) : layoutManual(text,box,override,measureAtSize);
       const element = document.createElement('div'); element.className = 'ezr-pdf-text';
+      element.dataset.overflow = String(!layout.fits);
       element.dataset.box = key(pageModel.number,box); element.dataset.fontSize = layout.fontSize;
       element.dataset.sourceFontSize = box.fontSize; element.dataset.fullText = text;
       element.dir = /[\u0590-\u08ff]/u.test(text) ? 'rtl' : 'ltr';
@@ -114,8 +132,8 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
         if (generation !== token || revision !== version) break;
         surface.style.transform = 'scale(' + scale + ')';
         const overlay = document.createElement('div'); overlay.className = 'ezr-pdf-overlay'; overlay.appendChild(surface);
-        old?.remove(); pageView.div.appendChild(overlay); pageView.div.classList.add('ezr-pdf-translated');
-        painted.set(pageView.div,{ revision:version });
+        editor.cancelDrag(); old?.remove(); pageView.div.appendChild(overlay); pageView.div.classList.add('ezr-pdf-translated');
+        painted.set(pageView.div,{ revision:version }); editor.refresh();
       }
     } catch (error) { if (generation === token) onError?.(error.message); }
     finally { busy = false; if (generation !== token || revision !== version) schedule(); }
@@ -125,7 +143,7 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
 
   async function exportPreview(target, onProgress = () => {}) {
     if (!parsed || !values.size) throw new Error('请先完成至少一个文本框的翻译。');
-    const model = parsed, token = generation, snapshot = new Map(values);
+    const model = parsed, token = generation, snapshot = new Map(values), fontSnapshot = new Map(fontSizes);
     const output = target.document; output.title = model.title.replace(/\.pdf$/i,'') + ' - 译文';
     const css = output.createElement('style');
     css.textContent = PDF_TRANSLATION_CSS + `
@@ -145,7 +163,7 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     for (const pageModel of model.pages) {
       if (generation !== token || target.closed) throw new Error('导出已取消，PDF 已切换或导出窗口已关闭。');
       onProgress(pageModel.number,model.pages.length);
-      const surface = await renderPage(pageModel,snapshot,2.5);
+      const surface = await renderPage(pageModel,snapshot,2.5,fontSnapshot,'print');
       if (generation !== token || target.closed) throw new Error('PDF 已切换，导出已取消。');
       const canvas = surface.querySelector('canvas'), img = output.createElement('img');
       img.src = canvas.toDataURL('image/png'); img.alt = ''; canvas.replaceWith(img); canvas.width = canvas.height = 0;
@@ -164,10 +182,21 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     button.disabled = false;
     return { pages:model.pages.length, translated:snapshot.size, remaining:missing };
   }
-  return { prepare:prepareGroups, apply, restore, reset, exportPreview,
-    get state() { return { boxes:groups.length, translated:values.size, pages:parsed?.pages.length || 0 }; },
+  function applyFontSize(size) {
+    if (!editor.state.active || !editor.state.selected.length) return;
+    if (size !== null && (!Number.isFinite(size) || size < 1 || size > 144)) throw new Error('字号请输入 1 到 144 之间的数值。');
+    for (const id of editor.state.selected) {
+      if (!values.has(id)) continue;
+      if (size === null) fontSizes.delete(id); else fontSizes.set(id,size);
+    }
+    revision++; schedule(); editor.refresh();
+  }
+  return { prepare:prepareGroups, apply, restore, reset, exportPreview, applyFontSize,
+    setEditing:value => editor.setActive(value), setEditAvailable:value => editor.setAvailable(value && values.size > 0),
+    clearSelection:() => editor.clear(),
+    get state() { return { boxes:groups.length, translated:values.size, editing:editor.state.active, fontOverrides:fontSizes.size, pages:parsed?.pages.length || 0 }; },
     destroy() {
-      reset(); clearTimeout(timer); style.remove();
+      reset(); editor.destroy(); clearTimeout(timer); style.remove();
       for (const name of ['pagerendered','scalechanging','pagechanging']) eventBus.off(name,schedule);
       container.removeEventListener('scroll',schedule);
     } };

@@ -19,14 +19,42 @@ let documentJob = null, loadController = null, generation = 0, extraction = null
 const message = text => { status.textContent = text; status.hidden = !text; };
 const toolbar = () => globalThis.__ezr.send({ type:'ezr:toolbar-open' });
 const exportButton = document.getElementById('pdf-export');
+const editButton = document.getElementById('pdf-batch-edit'), editControls = document.getElementById('pdf-edit-controls');
+const sizeInput = document.getElementById('pdf-edit-font-size');
+function setText(node,text) { if (node.textContent !== text) node.textContent = text; }
+function editChanged(state) {
+  editButton.hidden = !state.available; editButton.setAttribute('aria-pressed',String(state.active));
+  editControls.hidden = !state.active;
+  setText(document.getElementById('pdf-edit-count'),'已选 ' + state.selected.length + ' 个文本框');
+  for (const id of ['pdf-edit-font-size','pdf-edit-apply','pdf-edit-reset','pdf-edit-clear']) document.getElementById(id).disabled = !state.selected.length;
+  sizeInput.placeholder = state.mixed ? '多种字号' : '字号';
+  if (document.activeElement !== sizeInput) sizeInput.value = state.fontSize === null ? '' : String(Math.round(state.fontSize * 10) / 10);
+  setText(document.getElementById('pdf-edit-hint'),state.overflow ? state.overflow + ' 个文本框的译文超出原框，文字已完整保留；可减小字号或恢复自动字号。'
+    : '点击单选，拖动框选；Ctrl / Shift 点击可增减选择。Esc 退出。');
+}
+function syncEditAvailability() {
+  const host = document.getElementById('ezr-root');
+  pdfTranslation.setEditAvailable(!host || host.hasAttribute('data-ezr-original'));
+}
 let exporting = false;
 const pdfTranslation = createPdfTranslation({ viewer, eventBus, container,
   getPdf:() => documentJob?.pdf, prepare:() => globalThis.__ezrPreparePdf(),
-  onError:message, onChange:(translated,total) => {
+  onError:message, onEditChange:editChanged, onChange:(translated,total) => {
     exportButton.disabled = exporting || !translated;
     document.getElementById('pdf-translation-count').textContent = total ? translated + ' / ' + total + ' 个文本框已翻译' : '';
+    syncEditAvailability();
   } });
 globalThis.__ezrPdfTranslation = pdfTranslation;
+editButton.addEventListener('click',() => pdfTranslation.setEditing(!pdfTranslation.state.editing));
+document.getElementById('pdf-edit-done').addEventListener('click',() => { pdfTranslation.setEditing(false); editButton.focus(); });
+document.getElementById('pdf-edit-clear').addEventListener('click',() => pdfTranslation.clearSelection());
+document.getElementById('pdf-edit-reset').addEventListener('click',() => pdfTranslation.applyFontSize(null));
+function applySize() {
+  try { pdfTranslation.applyFontSize(Number(sizeInput.value)); }
+  catch (error) { message(error.message); }
+}
+document.getElementById('pdf-edit-apply').addEventListener('click',applySize);
+sizeInput.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); applySize(); } });
 exportButton.addEventListener('click',async () => {
   if (exporting) return;
   const target = window.open('about:blank','_blank');
@@ -110,6 +138,7 @@ navigationResize.observe(document.getElementById('pdf-navigation'));
 let observedHost, observedSlots = [];
 const resize = new ResizeObserver(() => fitTools());
 function fitTools() {
+  syncEditAvailability();
   const host = document.getElementById('ezr-root');
   const slots = [...host?.shadowRoot?.querySelectorAll('.ezr-toolbar-slot') || []];
   if (host !== observedHost || slots.length !== observedSlots.length || slots.some((slot, index) => slot !== observedSlots[index])) {

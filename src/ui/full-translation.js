@@ -12,6 +12,7 @@ const CSS = `
 .ezr-full-caption { display:flex; align-items:center; min-height:30px; color:var(--ezr-muted); }
 .ezr-full-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
 .ezr-full-bar button,.ezr-full-bar select { min-height:30px; font:inherit; color:inherit; background:var(--ezr-bg); border:1px solid var(--ezr-border); border-radius:7px; padding:4px 9px; cursor:pointer; }
+.ezr-full-bar button:disabled {opacity:.55;cursor:default;}
 .ezr-full-bar button:hover,.ezr-full-bar select:hover { background:color-mix(in srgb,var(--ezr-fg) 6%,var(--ezr-bg)); }
 .ezr-full-bar :is(button,select,input):focus-visible,.ezr-translation-note button:focus-visible { outline:2px solid var(--ezr-accent);outline-offset:2px; }
 .ezr-full-bar .ezr-full-start[aria-pressed="false"] {background:var(--ezr-accent);color:var(--ezr-accent-fg);border-color:var(--ezr-accent);}
@@ -40,15 +41,17 @@ const CSS = `
 
 /** A document owns the translation cache, shared by website and all reader re-renders. */
 export function createFullTranslation({ doc = document, request = message => chrome.runtime.sendMessage(message), isReaderActive = () => false }) {
-  let bar, status, start, stop, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, selectionInput, targetInput, readerTools, dockButton;
+  let bar, status, start, stop, retry, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, selectionInput, targetInput, readerTools, dockButton;
   let reader = null, website = [], readerGroups = [], pdfGroups = [], notes = null, view = null;
   let enabled = false, bilingual = true, running = false, epoch = 0, revision = 0, url = doc.location.href, signature = '';
   let visible = false, originalSuspended = false, selectionPrefs = normalizeTranslation();
   let navigationTimer = 0, savingPreferences = false;
   let activeProvider = selectionPrefs.provider;
-  const cache = new Map();
+  const cache = new Map(), failures = new Map();
   const make = (tag, cls, text) => { const element = doc.createElement(tag); element.className = cls; if (text) element.textContent = text; return element; };
   const cacheKey = (text, provider = activeProvider) => JSON.stringify([provider, text]);
+  const failedTexts = (provider = activeProvider) => [...failures.values()]
+    .filter(item => item.provider === provider && !cache.has(cacheKey(item.source, provider))).map(item => item.source);
   const message = text => { if (status) status.textContent = text; };
   const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); };
   function ensureUI() {
@@ -56,6 +59,8 @@ export function createFullTranslation({ doc = document, request = message => chr
     if (!navigationTimer) navigationTimer = setInterval(checkUrl, 750);
     bar = make('div', 'ezr-full-bar'); bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', '翻译工具栏'); bar.id = 'ezr-translation-bar'; bar.hidden = true;
     start = make('button', 'ezr-full-start', '全文翻译'); stop = make('button', 'ezr-full-stop', '停止'); stop.hidden = true;
+    retry = make('button', 'ezr-full-retry', '重试失败项'); retry.hidden = true;
+    retry.addEventListener('click', () => { void translate(true); });
     providerInput = make('select', 'ezr-full-provider'); providerInput.setAttribute('aria-label', '全文翻译服务');
     for (const [value, label] of [['free', '免费翻译'], ['deepseek', 'DeepSeek']]) { const option = make('option', '', label); option.value = value; providerInput.appendChild(option); }
     providerInput.value = selectionPrefs.provider;
@@ -90,7 +95,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     end.append(readerTools, dockButton, close);
     const caption = make('span', 'ezr-full-caption', '翻译');
     const controls = make('div', 'ezr-full-controls');
-    controls.append(providerInput, targetLabel, start, stop, inputText, selectionLabel, bilingualLabel, cardsLabel, levelInput, settings);
+    controls.append(providerInput, targetLabel, start, stop, retry, inputText, selectionLabel, bilingualLabel, cardsLabel, levelInput, settings);
     bar.append(caption, controls, end, status);
     for (const button of bar.querySelectorAll('button')) button.type = 'button';
     start.addEventListener('click', () => { if (enabled || running) showOriginal(); else void translate(); });
@@ -149,6 +154,11 @@ export function createFullTranslation({ doc = document, request = message => chr
     start.disabled = savingPreferences; start.textContent = enabled || running ? '显示原文' : '全文翻译';
     start.setAttribute('aria-pressed', String(enabled || running));
     stop.hidden = !running;
+    const failed = failedTexts().length;
+    retry.hidden = failed === 0;
+    retry.disabled = running || savingPreferences;
+    retry.textContent = '重试失败项（' + failed + '）';
+    retry.setAttribute('aria-label', '重试 ' + failed + ' 个翻译失败项');
     selectionInput.checked = selectionPrefs.enabled;
     bilingualInput.checked = bilingual; bilingualInput.parentElement.hidden = !isReaderActive();
     cardsInput.parentElement.hidden = levelInput.hidden = !isReaderActive() || !selectionPrefs.enabled;
@@ -184,7 +194,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     epoch++; revision++; running = false; enabled = false;
     restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); website = []; readerGroups = [];
     pdfGroups = []; reader?.pdfTranslation?.restore();
-    cache.clear(); view = null; notes?.clear(); closeSelections();
+    cache.clear(); failures.clear(); view = null; notes?.clear(); closeSelections();
     sync(); if (status) status.textContent = '页面或翻译设置已改变，请重新开始。';
   }
   function checkUrl() { if (url !== doc.location.href) { invalidate(); url = doc.location.href; } }
@@ -200,9 +210,10 @@ export function createFullTranslation({ doc = document, request = message => chr
       } catch { return true; }
     });
   }
-  async function translate() {
+  async function translate(retryOnly = false) {
     if (!reader) return;
     ensureUI(); checkUrl(); if (running || savingPreferences) return;
+    if (retryOnly && !failedTexts().length) { sync(); return; }
     closeSelections();
     running = true; const token = ++epoch, version = revision, requestUrl = url; sync();
     try {
@@ -229,26 +240,44 @@ export function createFullTranslation({ doc = document, request = message => chr
         context: sampleContext(reader.isPdf ? pdfGroups.map(group => group.source).join('\n\n') : isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n')) };
       if (reader) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); }
       const groups = reader.isPdf ? pdfGroups : isReaderActive() ? readerGroups : website;
-      const texts = [...new Set(groups.flatMap(group => group.chunks))];
+      const texts = [...new Set([...groups.flatMap(group => group.chunks), ...(retryOnly ? failedTexts(provider) : [])])];
       if (!texts.length) throw new Error('当前视图没有可翻译的文字。');
       enabled = true; apply(website, false); apply(readerGroups, true); applyPdf();
-      const pending = texts.filter(text => !cache.has(cacheKey(text)));
-      let completed = texts.length - pending.length;
+      const pending = retryOnly ? failedTexts(provider) : texts.filter(text => !cache.has(cacheKey(text)));
+      let completed = texts.filter(text => cache.has(cacheKey(text))).length;
+      let lastError = '';
       while (pending.length && token === epoch && doc.location.href === url) {
         const batch = []; let length = 0;
         // One text run per message: stopping must not leave a queue of paid requests in the worker.
         while (pending.length && batch.length < 1 && length + pending[0].length <= 2000) { const text = pending.shift(); batch.push(text); length += text.length; }
         message(`翻译中 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory 免费翻译' : 'DeepSeek'} · 可随时停止`);
-        const result = await request({ type: 'ezr:translation:full', provider, texts: batch, view });
-        // Keep successful late results for resume, but never apply an obsolete page/config.
+        let result;
+        try { result = await request({ type: 'ezr:translation:full', provider, texts: batch, view }); }
+        catch (error) { result = { ok:false, message:error?.message || '无法连接翻译服务，请重试。' }; }
+        // Successful late results may be cached, but only the current run owns failure/UI state.
         if (doc.location.href !== requestUrl || revision !== version || signature !== nextSignature) return;
-        if (!result?.ok) throw new Error(result?.message || '全文翻译失败，请重试。');
-        result.results.forEach(item => cache.set(cacheKey(item.source, provider), item));
+        const accepted = new Map();
+        for (const item of Array.isArray(result?.results) ? result.results : []) {
+          if (!batch.includes(item?.source) || typeof item.text !== 'string' || !item.text.trim()) continue;
+          accepted.set(item.source, item);
+          cache.set(cacheKey(item.source, provider), item);
+        }
         if (token !== epoch) return;
-        completed += result.results.length; apply(website, false); apply(readerGroups, true); applyPdf();
-        if (result.error) throw new Error(`${result.error} 已完成 ${completed}/${texts.length}，重试会复用已完成内容。`);
+        for (const source of batch) {
+          const id = cacheKey(source, provider);
+          if (accepted.has(source)) failures.delete(id);
+          else {
+            lastError = result?.error || result?.message || '未收到有效译文，请重试。';
+            failures.set(id, { source, provider, message:lastError });
+          }
+        }
+        completed += accepted.size;
+        apply(website, false); apply(readerGroups, true); applyPdf(); sync();
       }
-      if (token === epoch) message(`已翻译 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'} · 切换视图复用结果`);
+      if (token === epoch) {
+        const failed = failedTexts(provider).length;
+        message(`已翻译 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'}${failed ? ' · ' + failed + ' 项失败，可点击「重试失败项」。' + (lastError ? ' ' + lastError : '') : ' · 切换视图复用结果'}`);
+      }
     } catch (error) { if (token === epoch) message(error.message || '全文翻译失败，请重试。'); }
     finally { if (token === epoch) { running = false; sync(); } }
   }
@@ -306,6 +335,6 @@ export function createFullTranslation({ doc = document, request = message => chr
     },
     get isSelectionOpen() { return !!originalSelection?.isOpen; },
     closeSelection() { originalSelection?.close(); },
-    get state() { return { enabled, running, bilingual, cached: cache.size }; },
+    get state() { return { enabled, running, bilingual, cached: cache.size, failed: failedTexts().length }; },
   };
 }

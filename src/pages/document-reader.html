@@ -12,10 +12,20 @@
     <label>页码 <input id="pdf-page" type="number" value="1" min="1" aria-label="PDF 页码"><span id="pdf-total"></span></label>
     <button id="pdf-fit" type="button">适应宽度</button>
     <button id="pdf-export" type="button" disabled title="翻译后导出 PDF">导出 PDF</button>
+    <button id="pdf-batch-edit" type="button" hidden aria-pressed="false" aria-controls="pdf-edit-controls">批量编辑</button>
     <span id="pdf-translation-count" role="status" aria-live="polite"></span>
     <button id="open-toolbar" type="button">工具栏</button>
     <button id="cancel-load" type="button" hidden>停止打开</button>
     <form id="source-form" hidden><label for="pdf-source">页面中的 PDF</label><select id="pdf-source"></select><button type="submit">打开 PDF</button></form>
+    <div id="pdf-edit-controls" role="group" aria-label="译文文本框批量编辑" hidden>
+      <span id="pdf-edit-count" role="status" aria-live="polite">已选 0 个文本框</span>
+      <label>字号 <input id="pdf-edit-font-size" type="number" min="1" max="144" step="0.1" aria-label="所选译文文本框字号">pt</label>
+      <button id="pdf-edit-apply" type="button" disabled>应用字号</button>
+      <button id="pdf-edit-reset" type="button" disabled>恢复自动字号</button>
+      <button id="pdf-edit-clear" type="button" disabled>清空选择</button>
+      <button id="pdf-edit-done" type="button">完成</button>
+      <span id="pdf-edit-hint" role="status" aria-live="polite">点击单选，拖动框选；Ctrl / Shift 点击可增减选择。Esc 退出。</span>
+    </div>
   </nav>
   <p id="pdf-status" data-ezr-ui role="status" aria-live="polite" hidden></p>
   <div id="pdf-container" tabindex="0" aria-label="PDF 原文"><div id="pdf-pages" class="pdfViewer"></div></div>

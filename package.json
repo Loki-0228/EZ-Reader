@@ -12,6 +12,7 @@
     "dev": "node tools/serve.js",
     "test": "node tools/run-tests.js",
     "test:browser": "node tools/browser-test.js",
+    "test:pdf": "node tools/build.js && node tools/pdf-translation-checks.js",
     "verify": "node tools/build.js && node tools/smoke-bundle.js && node tools/run-tests.js && node tools/browser-test.js"
   },
   "dependencies": {},

@@ -18,3 +18,11 @@ button:hover,.pdf-file-button:hover { background:color-mix(in srgb,var(--accent)
 #pdf-pages { padding-top:18px; }
 ::selection { background:#3c73cb40; }
 @media(prefers-color-scheme:dark) { :root { --paper:#202630; --ink:#e3e9f2; --line:#434d5c; background:#303743; } }
+#pdf-edit-controls { flex-basis:100%; min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding-top:8px; border-top:1px solid var(--line); }
+#pdf-edit-controls label { min-width:0; }
+#pdf-edit-font-size { width:82px; min-height:30px; padding:4px 8px; font:inherit; font-variant-numeric:tabular-nums; background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:7px; }
+#pdf-edit-count { font-variant-numeric:tabular-nums; }
+#pdf-edit-hint { flex-basis:100%; overflow-wrap:anywhere; }
+#pdf-batch-edit[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
+button:disabled,#pdf-edit-font-size:disabled { opacity:.55; cursor:default; }
+#pdf-edit-controls ::selection { background:color-mix(in srgb,var(--accent) 25%,transparent); }
