@@ -6,15 +6,31 @@ let tabId, currentTab;
 let nativeDocument = false;
 let toolbarEnabled = false;
 let canOpenToolbar = false;
+let toolbarVisible = null; // null = 无法向当前页探测（内容脚本不可达），按窗口开关兜底
+let showing = false;
 function status(text) { notice.textContent = text; notice.hidden = !text; }
 function updateToolbarButton(state) {
   toolbarEnabled = state.enabled === true;
-  buttonLabel.textContent = toolbarEnabled ? '关闭工具栏' : nativeDocument ? '打开 PDF 工具栏' : '网页工具栏';
-  button.title = toolbarEnabled ? '关闭当前浏览器窗口内的网页工具栏' : buttonLabel.textContent;
+  // 主栏被 × 藏掉或尚未显示时，按钮回到「打开」语义，与页面上看到的一致。
+  showing = toolbarEnabled && (toolbarVisible === null ? true : toolbarVisible);
+  buttonLabel.textContent = showing ? '关闭工具栏' : nativeDocument ? '打开 PDF 工具栏' : '网页工具栏';
+  button.title = showing ? '关闭当前浏览器窗口内的网页工具栏'
+    : toolbarEnabled && !nativeDocument ? '重新显示网页工具栏' : buttonLabel.textContent;
+}
+async function probeToolbarVisible() {
+  // 每个 frame 都应答 ezr:status，只认主框架的应答，其余再问一次。
+  for (let ask = 0; ask < 3; ask++) {
+    let reply = null;
+    try { reply = await chrome.tabs.sendMessage(tabId, { type: 'ezr:status' }); } catch { return null; }
+    if (reply?.topFrame) return reply.toolbarVisible === true;
+    if (!reply?.ok) return null;
+  }
+  return null;
 }
 async function readToolbarState() {
   const reply = await chrome.runtime.sendMessage({type:'ezr:window-toolbar:get',tabId});
   if (!reply?.ok) throw new Error(reply?.message || '无法读取工具栏状态，请重新打开扩展面板。');
+  toolbarVisible = await probeToolbarVisible();
   updateToolbarButton(reply);
 }
 async function init() {
@@ -37,7 +53,7 @@ async function init() {
 button.addEventListener('click', async () => {
   if (button.disabled) return;
   button.disabled = true; status('');
-  const enabled = !toolbarEnabled;
+  const enabled = !showing;
   try {
     if (enabled && nativeDocument) { await openDocuments(); return; }
     const reply = await chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',tabId,enabled});
