@@ -18668,7 +18668,8 @@ class CanvasGraphics {
     const visible = this.contentVisible;
     if (this.textFilter && visible) {
       const current = this.current;
-      const matrix = Util.transform(getCurrentTransform(this.ctx), current.textMatrix || IDENTITY_MATRIX);
+      const transform = getCurrentTransform(this.ctx);
+      const matrix = current.textMatrix ? Util.transform(transform, current.textMatrix) : transform;
       const point = [current.x, current.y + current.textRise];
       Util.applyTransform(point, matrix);
       this.contentVisible = this.textFilter({ x:point[0], y:point[1],
