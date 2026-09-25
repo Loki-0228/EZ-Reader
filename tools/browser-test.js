@@ -40,7 +40,7 @@ const ARTIFACTS = path.join(ROOT, 'test-artifacts');
 const PROFILE = path.join(ARTIFACTS, 'edge-profile');
 const PORT_HTTP = Number(process.env.EZR_TEST_PORT || 8799);
 const PORT_CDP = Number(process.env.EZR_CDP_PORT || 9333);
-const BASE = `http://localhost:${PORT_HTTP}`;
+let BASE = `http://localhost:${PORT_HTTP}`;
 
 const argv = process.argv.slice(2);
 const headed = argv.includes('--headed');
@@ -399,9 +399,17 @@ async function startFixtureServer() {
   });
 
   await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(PORT_HTTP, '127.0.0.1', resolve);
+    const start = (port) => {
+      server.once('error', (error) => {
+        // A reserved (EACCES) or busy (EADDRINUSE) port must not block the suite.
+        if (port && (error.code === 'EACCES' || error.code === 'EADDRINUSE')) { start(0); return; }
+        reject(error);
+      });
+      server.listen(port, '127.0.0.1', resolve);
+    };
+    start(PORT_HTTP);
   });
+  BASE = `http://localhost:${server.address().port}`;
   return { server, names };
 }
 
