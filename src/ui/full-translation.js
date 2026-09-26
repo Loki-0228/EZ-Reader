@@ -124,7 +124,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     close.addEventListener('click', () => { visible = false; bar.hidden = true; reader?.onTranslationVisibility?.(false); });
     originalRoot = make('div', 'ezr-original-selection'); reader.root.appendChild(originalRoot);
     originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original',
-      isActive: () => !!reader && !isReaderActive() && !originalSuspended, getView: () => view,
+      isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: () => view,
       getDocument: () => ({ title: doc.title, blocks: [] }) });
     void request({ type: 'ezr:translation:config' }).then(result => { if (result?.ok) { selectionPrefs = normalizeTranslation(result.config); sync(); } }).catch(() => {});
     place();
@@ -306,7 +306,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     mainToolbarChanged() { sync(); },
     resetDocument() { invalidate(); signature = ''; },
     getView() { checkUrl(); return view; },
-    isTranslatedSelection(range) { checkUrl(); return isTranslatedSelection(range, readerGroups); },
+    isTranslatedSelection(range) { checkUrl(); return isTranslatedSelection(range, website) || isTranslatedSelection(range, readerGroups); },
     addCards(cards, range) { return enabled && selectionPrefs.wordCards && selectionPrefs.enabled && notes ? notes.add(cards, range) : false; },
     beforeRead() { originalSuspended = true; closeSelections(); restoreTranslationGroups(website); },
     afterRead() { originalSuspended = false; if (enabled) apply(website, false); sync(); },

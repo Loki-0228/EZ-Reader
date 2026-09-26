@@ -293,7 +293,7 @@ function bootstrap() {
 
     const abort = new AbortController();
     const translation = createTranslation({ root: shell.root, article: shell.article, getDocument: () => currentDoc, doc,
-      getView: () => fullTranslation.getView(),
+      canSelect: range => !fullTranslation.isTranslatedSelection(range), getView: () => fullTranslation.getView(),
       onCards: (cards, range) => fullTranslation.addCards(cards, range) });
 
     // Free-form translation works in both views: it never depends on the article.

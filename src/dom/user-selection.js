@@ -1,4 +1,8 @@
-/** Read exactly the user's selection; ranges locate it, never reconstruct its text. */
+/**
+ * Read exactly the user's selection. The cloned range supplies the location and, on source
+ * pages, the text itself: CSS text-transform rewrites what Selection.toString() returns, and
+ * a displayed word form must never become the translation input or the cache key.
+ */
 const INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel']);
 function parent(node) { return node?.parentNode || node?.host || null; }
 function contains(root, node) {
@@ -32,20 +36,23 @@ function nearbyText(node, text) {
   const start = Math.max(0, index - 350);
   return value.slice(start, start + 1500).trim();
 }
-function snapshot(selection, doc, root, exclude) {
+function snapshot(selection, doc, root, exclude, domText) {
   if (!selection || selection.isCollapsed) return null;
   const anchorNode = selection.anchorNode, focusNode = selection.focusNode;
   if (!allowed(anchorNode, root, exclude) || !allowed(focusNode, root, exclude)) return null;
-  const text = selection.toString().trim();
-  if (!text) return null;
   let range = null;
   try {
     const candidate = selection.rangeCount ? selection.getRangeAt(0) : null;
     if (candidate && allowed(candidate.startContainer, root, exclude) && allowed(candidate.endContainer, root, exclude)) range = candidate.cloneRange();
   } catch { /* Some viewers supply selected text without an accessible Range. */ }
+  // A source page's text-transform rewrites Selection.toString() but not the DOM text, so the
+  // rendered form must not reach the translator. Views without that risk keep the browser
+  // string, which also carries the block separators between paragraphs.
+  const text = (domText && range ? range.toString() : selection.toString()).trim();
+  if (!text) return null;
   return { text, range, rect:rectangle(range, anchorNode, doc), anchorNode, focusNode, nearby:nearbyText(anchorNode, text), kind:'selection' };
 }
-function read(doc, root, exclude, depth) {
+function read(doc, root, exclude, depth, domText) {
   if (!doc || depth > 4) return null;
   let active = doc.activeElement;
   const scopes = [];
@@ -68,7 +75,7 @@ function read(doc, root, exclude, depth) {
   }
   if (active?.matches?.('iframe,frame') && allowed(active, root, exclude)) {
     try {
-      const result = read(active.contentDocument, null, null, depth + 1);
+      const result = read(active.contentDocument, null, null, depth + 1, domText);
       if (result) {
         const bounds = active.getBoundingClientRect();
         const scaleX = active.offsetWidth ? bounds.width / active.offsetWidth : 1;
@@ -89,13 +96,17 @@ function read(doc, root, exclude, depth) {
   scopes.push(doc);
   for (const scope of new Set(scopes)) {
     try {
-      const result = snapshot(scope.getSelection?.(), doc, root, exclude);
+      const result = snapshot(scope.getSelection?.(), doc, root, exclude, domText);
       if (result) return result;
     } catch { /* A viewer may disallow selection access. */ }
   }
   return null;
 }
-/** Returns null or {text, range|null, rect, anchorNode, focusNode, nearby, kind}. */
-export function readUserSelection({ doc = globalThis.document, root = null, exclude = null } = {}) {
-  try { return read(doc, root, exclude, 0); } catch { return null; }
+/**
+ * Returns null or {text, range|null, rect, anchorNode, focusNode, nearby, kind}.
+ * `domText` reads the range's own DOM text instead of the browser's rendered string, for the
+ * views where source-page CSS can restyle the selected words.
+ */
+export function readUserSelection({ doc = globalThis.document, root = null, exclude = null, domText = false } = {}) {
+  try { return read(doc, root, exclude, 0, domText); } catch { return null; }
 }

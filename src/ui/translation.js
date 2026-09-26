@@ -144,7 +144,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     if (destroyed || !prefs.enabled || selecting || !isActive() || !root.isConnected || shadow.querySelector('.ezr-settings.is-open')
       || (mode !== 'original' && shadow.host?.hasAttribute('data-ezr-original'))) return;
     if (doc.location.href !== lastUrl) { reset(); lastUrl = doc.location.href; }
-    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel });
+    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel, domText: mode === 'original' });
     if (!snapshot) {
       const active = shadow.activeElement || doc.activeElement;
       const anchor = shadow.getSelection?.()?.anchorNode || doc.getSelection()?.anchorNode;
@@ -200,7 +200,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
       if (mode === 'original') context = chosen.nearby || chosen.text;
       else if (!context) context = sampleContext((ir.blocks || []).map(block => block.text || '').join('\n\n')) || chosen.nearby || chosen.text;
       const payload = { provider, text: chosen.text, nearby: chosen.nearby,
-        view: (mode === 'original' ? null : getView()) || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
+        view: getView() || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
       const reply = await request({ type: 'ezr:translation:run', ...payload });
       if (!alive(chosen, token)) return;
       if (!reply?.ok) throw new Error(reply?.message || '翻译服务暂时无响应，请重试。');
