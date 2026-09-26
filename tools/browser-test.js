@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { CdpPage, CdpSession, waitForEndpoint } from './cdp.js';
 import { translationChecks } from './translation-checks.js';
 import { fullTranslationChecks } from './full-translation-checks.js';
+import { bubbleCardChecks } from './bubble-card-checks.js';
 import { toolbarChecks } from './toolbar-checks.js';
 import { textTranslationChecks } from './text-translation-checks.js';
 
@@ -171,6 +172,7 @@ const SUITES = {
   // `full-translation` asserts what happens when NO DeepSeek key is configured, so it
   // must run before any suite that stores one (`translation`, then `text-translation`).
   'full-translation': { fixture: 'full-translation.html' },
+  'bubble-cards': { fixture: 'full-translation.html' },
   translation: { fixture: 'translation.html' },
   'text-translation': { fixture: 'paper.html' },
   interaction: { fixture: 'interaction.html' },
@@ -1003,6 +1005,10 @@ async function main() {
       }
       if (name === 'full-translation') {
         await fullTranslationChecks(page, iso, check, ARTIFACTS);
+        continue;
+      }
+      if (name === 'bubble-cards') {
+        await bubbleCardChecks(page, iso, check, ARTIFACTS);
         continue;
       }
 

@@ -17,6 +17,40 @@ function fixture() {
   return {bag,deliveries,injections,frames,tabs,api,listeners,sender,transport,controller:registerWindowToolbar(api,transport)};
 }
 const set = (f, enabled, sender=f.sender) => f.controller.handle({type:'ezr:window-toolbar:set',enabled},sender);
+const translation = (f, visible, sender=f.sender) => f.controller.handle({type:'ezr:window-toolbar:translation',visible},sender);
+
+test('translation visibility survives navigation and worker sleep without reopening locally hidden bars',async()=>{
+  const f=fixture(); await set(f,true); f.deliveries.length=0;
+  await translation(f,true);
+  assert.equal(f.deliveries.length,0);
+  assert.equal(f.bag['ezr:toolbar:window:10'].revision,1);
+  const reloaded=registerWindowToolbar(f.api,f.transport);
+  assert.equal((await reloaded.handle({type:'ezr:window-toolbar:get'},f.sender)).translationVisible,true);
+  await reloaded.sync(1); assert.equal(f.deliveries.at(-1).translationVisible,true);
+  await translation(f,false); await reloaded.sync(1);
+  assert.equal(f.deliveries.at(-1).translationVisible,false);
+  assert.equal((await reloaded.handle({type:'ezr:window-toolbar:get'},{...f.sender,tab:f.tabs[2]})).translationVisible,false);
+});
+
+test('PDF visibility preferences alone do not configure or enable webpage toolbars',async()=>{
+  const f=fixture(); await translation(f,true);
+  const state=await f.controller.handle({type:'ezr:window-toolbar:get'},f.sender);
+  assert.equal(state.configured,false); assert.equal(state.enabled,false); assert.equal(state.translationVisible,true);
+  await f.controller.sync(2); assert.equal(f.deliveries.length,0);
+  await set(f,true); await set(f,false); await translation(f,false);
+  assert.equal(f.bag['ezr:toolbar:window:10'].enabled,false);
+  await Promise.all([translation(f,true),set(f,true),translation(f,false)]);
+  assert.equal(f.bag['ezr:toolbar:window:10'].enabled,true);
+  assert.equal(f.bag['ezr:toolbar:window:10'].translationVisible,false);
+});
+
+test('translation visibility validates values and trusted top-frame senders',async()=>{
+  const f=fixture();
+  await assert.rejects(()=>translation(f,true,{...f.sender,id:'foreign'}));
+  await assert.rejects(()=>translation(f,true,{...f.sender,frameId:1}));
+  await assert.rejects(()=>translation(f,'false'));
+  assert.deepEqual(f.bag,{});
+});
 
 test('toolbar state and broadcasts are scoped to the trusted sender window',async()=>{
   const f=fixture(); await set(f,true);

@@ -56,7 +56,7 @@ export function registerTranslation(chromeApi = chrome) {
       return writeConfig(async () => {
         const bag = await chromeApi.storage.local.get(TRANSLATION_KEY);
         const patch = {};
-        for (const key of ['enabled', 'provider', 'preload', 'source', 'target', 'textTarget', 'model', 'explanations', 'wordCards', 'autoSave', 'level', 'stylePrompt']) {
+        for (const key of ['enabled', 'provider', 'preload', 'source', 'target', 'textTarget', 'model', 'explanations', 'wordCards', 'bubbleCards', 'autoSave', 'level', 'stylePrompt']) {
           if (Object.hasOwn(message.patch || {}, key)) patch[key] = message.patch[key];
         }
         const config = normalizeTranslation({ ...normalizeTranslation(bag[TRANSLATION_KEY]), ...patch });
@@ -137,7 +137,7 @@ export function registerTranslation(chromeApi = chrome) {
       view: isText ? { ...message.view, fullDocument:false } : message.view, text: message.text, nearby: message.nearby, provider,
       freeform: message.type === 'ezr:translation:text',
       translation: message.translation, sourceLanguage: message.sourceLanguage,
-      texts: message.texts,
+      texts: message.texts, excludeTerms: message.excludeTerms,
     }, requestConfig, provider === 'deepseek' ? await credentials.get() : '');
     return { ok: true, ...result };
   }

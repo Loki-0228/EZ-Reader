@@ -3,30 +3,34 @@ import { collectTranslationGroups, applyTranslationGroup, restoreTranslationGrou
 import { prioritizeWebsiteGroups } from '../dom/translation-order.js';
 import { createTranslation } from './translation.js';
 import { createTranslationNotes } from './translation-notes.js';
+import { createBubbleCards, bubbleKey } from './bubble-cards.js';
 import { closeIcon } from './close-icon.js';
 import { dockIcon } from './dock-icon.js';
 
 const CSS = `
-.ezr-full-bar { flex:none; display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0,1fr) auto; align-items:start; gap:4px 12px; padding:10px 16px; border-bottom:1px solid var(--ezr-border); background:var(--ezr-bg); color:var(--ezr-fg); font:13px/1.4 'Segoe UI','Microsoft YaHei',sans-serif; }
+.ezr-full-bar { flex:none; display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0,1fr) auto; align-items:start; gap:.308em .923em; padding:.769em 1.231em; border-bottom:1px solid var(--ezr-border); background:var(--ezr-bg); color:var(--ezr-fg); font:var(--ezr-tool-size,13px)/1.4 'Segoe UI','Microsoft YaHei',sans-serif; }
 .ezr-full-bar[hidden],.ezr-full-bar [hidden],.ezr-translation-note[hidden]{display:none!important}
-.ezr-full-caption { display:flex; align-items:center; min-height:30px; color:var(--ezr-muted); }
-.ezr-full-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
-.ezr-full-bar button,.ezr-full-bar select { min-height:30px; font:inherit; color:inherit; background:var(--ezr-bg); border:1px solid var(--ezr-border); border-radius:7px; padding:4px 9px; cursor:pointer; }
+.ezr-full-caption { display:flex; align-items:center; min-height:2.308em; color:var(--ezr-muted); }
+.ezr-full-controls { display:flex; align-items:center; flex-wrap:wrap; gap:.615em; min-width:0; }
+.ezr-full-bar button,.ezr-full-bar select { min-height:2.308em; font:inherit; color:inherit; background:var(--ezr-bg); border:1px solid var(--ezr-border); border-radius:7px; padding:.308em .692em; cursor:pointer; }
 .ezr-full-bar button:disabled {opacity:.55;cursor:default;}
 .ezr-full-bar button:hover,.ezr-full-bar select:hover { background:color-mix(in srgb,var(--ezr-fg) 6%,var(--ezr-bg)); }
 .ezr-full-bar :is(button,select,input):focus-visible,.ezr-translation-note button:focus-visible { outline:2px solid var(--ezr-accent);outline-offset:2px; }
 .ezr-full-bar .ezr-full-start[aria-pressed="false"] {background:var(--ezr-accent);color:var(--ezr-accent-fg);border-color:var(--ezr-accent);}
-.ezr-full-bar label {display:flex;align-items:center;gap:6px;white-space:nowrap;min-height:30px;}
-.ezr-full-bar input[type="checkbox"] { accent-color:var(--ezr-accent); }
-.ezr-full-status{grid-column:2; color:var(--ezr-muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
+.ezr-full-bar label {display:flex;align-items:center;gap:.462em;white-space:nowrap;min-height:2.308em;}
+.ezr-full-bar input[type="checkbox"] { accent-color:var(--ezr-accent); width:1em;height:1em;font:inherit; }
+.ezr-full-status{grid-column:2; color:var(--ezr-muted);font-size:.923em;line-height:1.5;overflow-wrap:anywhere;}
 .ezr-full-status:empty {display:none;}
 .ezr-full-selection-toggle {padding:0 4px;}
 .ezr-full-end {grid-column:3;grid-row:1;}
 .ezr-full-controls > * {max-width:100%;}
 .ezr-full-target-language {min-width:0;}
 .ezr-full-target-select {min-width:0;max-width:100%;}
+.ezr-full-preferences{display:flex;align-items:center;gap:.615em;margin-inline-start:auto;flex-wrap:wrap;justify-content:flex-end}
+.ezr-full-bar .ezr-full-settings{min-width:5.6em;white-space:nowrap}
 @media(max-width:760px) { .ezr-full-bar {grid-template-columns:minmax(0,1fr) auto;} .ezr-full-caption{display:none;} .ezr-full-end{grid-column:2;} .ezr-full-status{grid-column:1;} }
 @media(max-width:520px) { .ezr-full-bar{grid-template-columns:minmax(0,1fr);gap:8px;} .ezr-full-end{grid-column:1;grid-row:1;} .ezr-full-controls{grid-column:1;grid-row:2;} .ezr-full-status{grid-column:1;grid-row:3;} }
+@media(max-width:520px) { .ezr-full-page-status{grid-row:4;} }
 .ezr-translation-note button {font:inherit; color:inherit; background:transparent; border:1px solid var(--ezr-border); border-radius:7px; padding:5px 9px; cursor:pointer;}
 .ezr-full-target{display:block; margin-top:.65em; padding-top:.5em; border-top:1px solid var(--ezr-border);color:var(--ezr-fg);font-size:.94em;line-height:1.75;text-transform:none}
 .ezr-translation-notes{position:fixed;inset:0;pointer-events:none;z-index:25}
@@ -40,20 +44,55 @@ const CSS = `
 `;
 
 /** A document owns the translation cache, shared by website and all reader re-renders. */
-export function createFullTranslation({ doc = document, request = message => chrome.runtime.sendMessage(message), isReaderActive = () => false }) {
+export function createFullTranslation({ doc = document, request = message => chrome.runtime.sendMessage(message), isReaderActive = () => false, onVisibilityChange = () => {} }) {
   let bar, status, start, stop, retry, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, selectionInput, targetInput, readerTools, dockButton;
   let reader = null, website = [], readerGroups = [], pdfGroups = [], notes = null, view = null;
   let enabled = false, bilingual = true, running = false, epoch = 0, revision = 0, url = doc.location.href, signature = '';
   let visible = false, originalSuspended = false, selectionPrefs = normalizeTranslation();
-  let navigationTimer = 0, savingPreferences = false;
+  let navigationTimer = 0, savingPreferences = false, unsubscribePdf, pageStatus, bubbleInput, bubbles;
+  const bubbleState = { cards:new Map(), closed:new Set() };
   let activeProvider = selectionPrefs.provider;
   const cache = new Map(), failures = new Map();
   const make = (tag, cls, text) => { const element = doc.createElement(tag); element.className = cls; if (text) element.textContent = text; return element; };
   const cacheKey = (text, provider = activeProvider) => JSON.stringify([provider, text]);
+  const pdfAllowed = group => !reader?.pdfTranslation?.isOriginal?.(group.id);
+  const textAllowed = text => !reader?.isPdf || pdfGroups.some(group => pdfAllowed(group) && group.chunks.includes(text));
   const failedTexts = (provider = activeProvider) => [...failures.values()]
-    .filter(item => item.provider === provider && !cache.has(cacheKey(item.source, provider))).map(item => item.source);
+    .filter(item => item.provider === provider && textAllowed(item.source) && (!cache.has(cacheKey(item.source, provider)) || (item.cards && selectionPrefs.bubbleCards
+      && (cache.get(cacheKey(item.source, provider))?.wordsLevel !== item.level || cache.get(cacheKey(item.source, provider))?.wordsExplanations !== item.explanations)
+      ))).map(item => item.source);
+  const failedPageNumbers = () => {
+    if (!reader?.isPdf) return [];
+    const texts = new Set(failedTexts());
+    return [...new Set([...pdfGroups.filter(group => pdfAllowed(group) && group.chunks.some(chunk => texts.has(chunk))).map(group => group.page),
+      ...(reader.pdfTranslation?.state.failedPages || [])])].sort((a,b) => a - b);
+  };
   const message = text => { if (status) status.textContent = text; };
-  const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); };
+  const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); bubbles?.minimize(); };
+  function bubbleSources() {
+    const wordsFor = chunks => chunks.flatMap(chunk => {
+      const result = cache.get(cacheKey(chunk));
+      return result?.wordsLevel === selectionPrefs.level && result.wordsExplanations === selectionPrefs.explanations ? result.words || [] : [];
+    });
+    if (reader?.isPdf && !isReaderActive()) {
+      const elements = new Map([...doc.querySelectorAll('.ezr-pdf-text')].map(node => [node.dataset.box, node]));
+      return pdfGroups.flatMap(group => {
+      const element = elements.get(group.id);
+      if (!element) return [];
+      const walker = doc.createTreeWalker(element, 4), nodes = []; let node;
+      while ((node = walker.nextNode())) nodes.push(node);
+      return [{ nodes, source:group.source, words:wordsFor(group.chunks), translated:true }];
+      });
+    }
+    return (isReaderActive() ? readerGroups : website).map(group => ({
+      nodes:group.runs.flatMap(run => run.inserted ? [run.inserted] : run.nodes.map(item => item.node)),
+      source:group.source, words:wordsFor(group.chunks), translated:!!group.appliedResults && !group.appliedMode,
+    }));
+  }
+  function syncBubbles() {
+    bubbles?.update({ active:enabled && selectionPrefs.bubbleCards && !originalSuspended && !(reader?.isPdf && !isReaderActive() && reader.pdfTranslation?.state.editing),
+      target:selectionPrefs.target, selectionEnabled:selectionPrefs.enabled, original:!isReaderActive() });
+  }
   function ensureUI() {
     if (bar || !reader) return;
     if (!navigationTimer) navigationTimer = setInterval(checkUrl, 750);
@@ -83,7 +122,12 @@ export function createFullTranslation({ doc = document, request = message => chr
     for (const [value, label] of ENGLISH_LEVELS) { const option = make('option', '', label); option.value = value; levelInput.appendChild(option); }
     levelInput.value = selectionPrefs.level;
     const settings = make('button', 'ezr-full-settings', '翻译设置'), close = make('button', 'ezr-full-close ezr-toolbar-close', ''); close.setAttribute('aria-label', '关闭翻译工具栏'); close.title = '关闭翻译工具栏'; close.appendChild(closeIcon(doc));
+    const bubbleLabel = make('label', 'ezr-full-bubble-toggle'); bubbleInput = make('input', 'ezr-full-bubbles'); bubbleInput.type = 'checkbox';
+    bubbleLabel.append(bubbleInput, doc.createTextNode('泡泡词卡'));
+    bubbleLabel.title = '独立于划词翻译；绿点为本篇词卡，黄点为生词本词汇。DeepSeek 随全文翻译生成，免费服务复用已有词卡。';
+    const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(bubbleLabel, settings);
     status = make('span', 'ezr-full-status', ''); status.setAttribute('aria-live', 'polite');
+    pageStatus = make('span', 'ezr-full-status ezr-full-page-status', ''); pageStatus.setAttribute('aria-live', 'polite');
     readerTools = make('button', 'ezr-full-reader-tools', '阅读工具');
     readerTools.title = '显示阅读工具栏';
     readerTools.setAttribute('aria-label', '显示阅读工具栏');
@@ -95,14 +139,14 @@ export function createFullTranslation({ doc = document, request = message => chr
     end.append(readerTools, dockButton, close);
     const caption = make('span', 'ezr-full-caption', '翻译');
     const controls = make('div', 'ezr-full-controls');
-    controls.append(providerInput, targetLabel, start, stop, retry, inputText, selectionLabel, bilingualLabel, cardsLabel, levelInput, settings);
-    bar.append(caption, controls, end, status);
+    controls.append(providerInput, targetLabel, start, stop, retry, inputText, selectionLabel, bilingualLabel, cardsLabel, levelInput, preferencesGroup);
+    bar.append(caption, controls, end, status, pageStatus);
     for (const button of bar.querySelectorAll('button')) button.type = 'button';
     start.addEventListener('click', () => { if (enabled || running) showOriginal(); else void translate(); });
     inputText.addEventListener('click', () => { reader?.openTextTranslation?.(); });
     selectionInput.addEventListener('change', () => { void preferences({ enabled:selectionInput.checked }); });
     stop.addEventListener('click', () => { epoch++; running = false; sync(); message('已停止，已完成的译文保留。可切回原文后继续翻译。'); });
-    bilingualInput.addEventListener('change', () => { closeSelections(); bilingual = bilingualInput.checked; apply(readerGroups, true); notes?.clear(); });
+    bilingualInput.addEventListener('change', () => { closeSelections(); bilingual = bilingualInput.checked; apply(readerGroups, true); notes?.clear(); syncBubbles(); });
     async function preferences(patch) {
       if (savingPreferences) return;
       savingPreferences = true;
@@ -115,13 +159,15 @@ export function createFullTranslation({ doc = document, request = message => chr
         selectionPrefs = normalizeTranslation(result.config); notes?.clear(); sync();
       } catch (error) { selectionPrefs = before; message(error.message); }
       finally { savingPreferences = false; sync(); }
+      if (enabled && !running && selectionPrefs.bubbleCards && (patch.bubbleCards || patch.level)) void translate();
     }
+    bubbleInput.addEventListener('change', () => { void preferences({ bubbleCards:bubbleInput.checked }); });
     cardsInput.addEventListener('change', () => { void preferences({ wordCards: cardsInput.checked }); });
     levelInput.addEventListener('change', () => { void preferences({ level: levelInput.value }); });
     providerInput.addEventListener('change', () => { void preferences({ provider: providerInput.value }); });
     targetInput.addEventListener('change', () => { void preferences({ target:targetInput.value }); });
     settings.addEventListener('click', () => { void request({ type: 'ezr:translation:options' }); });
-    close.addEventListener('click', () => { visible = false; bar.hidden = true; reader?.onTranslationVisibility?.(false); });
+    close.addEventListener('click', () => setToolbarVisible(false, true));
     originalRoot = make('div', 'ezr-original-selection'); reader.root.appendChild(originalRoot);
     originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original',
       isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: () => view,
@@ -150,19 +196,26 @@ export function createFullTranslation({ doc = document, request = message => chr
     dockButton.title = dockLabel;
     dockButton.setAttribute('aria-label', dockLabel);
     dockButton.setAttribute('aria-pressed', String(atBottom));
-    for (const input of [providerInput, targetInput, selectionInput, cardsInput, levelInput]) input.disabled = savingPreferences;
+    for (const input of [providerInput, targetInput, selectionInput, cardsInput, levelInput, bubbleInput]) input.disabled = savingPreferences;
+    bubbleInput.disabled ||= running; levelInput.disabled ||= running;
     start.disabled = savingPreferences; start.textContent = enabled || running ? '显示原文' : '全文翻译';
     start.setAttribute('aria-pressed', String(enabled || running));
     stop.hidden = !running;
-    const failed = failedTexts().length;
+    const pages = failedPageNumbers(), failed = reader?.isPdf ? pages.length : failedTexts().length;
     retry.hidden = failed === 0;
-    retry.disabled = running || savingPreferences;
-    retry.textContent = '重试失败项（' + failed + '）';
-    retry.setAttribute('aria-label', '重试 ' + failed + ' 个翻译失败项');
+    retry.disabled = running || savingPreferences || !!reader?.pdfTranslation?.state.retrying;
+    retry.textContent = (reader?.isPdf ? '重试失败页' : '重试失败项') + '（' + failed + '）';
+    retry.setAttribute('aria-label', reader?.isPdf ? '重试第 ' + pages.join('、') + ' 页' : '重试 ' + failed + ' 个翻译失败项');
+    retry.title = reader?.isPdf ? '重试失败页中的未完成内容，复用已有译文' : '只重试未成功的翻译片段';
+    const renderPages = reader?.pdfTranslation?.state.failedPages || [];
+    pageStatus.textContent = pages.length ? '第 ' + pages.join('、') + ' 页未完成。'
+      + (renderPages.length ? '其中第 ' + renderPages.join('、') + ' 页译文显示失败。' : '') + '可点击「重试失败页」，已有译文会保留。' : '';
     selectionInput.checked = selectionPrefs.enabled;
     bilingualInput.checked = bilingual; bilingualInput.parentElement.hidden = !isReaderActive();
-    cardsInput.parentElement.hidden = levelInput.hidden = !isReaderActive() || !selectionPrefs.enabled;
+    cardsInput.parentElement.hidden = !isReaderActive() || !selectionPrefs.enabled;
+    levelInput.hidden = (!isReaderActive() || !selectionPrefs.enabled) && !selectionPrefs.bubbleCards;
     cardsInput.checked = selectionPrefs.wordCards; levelInput.value = selectionPrefs.level;
+    bubbleInput.checked = selectionPrefs.bubbleCards; syncBubbles();
   }
   function place() {
     if (!bar || !reader) return;
@@ -170,6 +223,11 @@ export function createFullTranslation({ doc = document, request = message => chr
     if (host) { if (bar.parentNode !== host) host.appendChild(bar); }
     else reader.root.insertBefore(bar, reader.article.parentElement);
     bar.hidden = !visible; reader?.onTranslationVisibility?.(visible); sync();
+  }
+  function setToolbarVisible(value, remember = false) {
+    visible = value === true;
+    if (reader) { ensureUI(); place(); }
+    if (remember) onVisibilityChange(visible);
   }
   function apply(groups, inReader) {
     if (!enabled || !reader || (!inReader && (originalSuspended || isReaderActive()))) return;
@@ -194,7 +252,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     epoch++; revision++; running = false; enabled = false;
     restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); website = []; readerGroups = [];
     pdfGroups = []; reader?.pdfTranslation?.restore();
-    cache.clear(); failures.clear(); view = null; notes?.clear(); closeSelections();
+    cache.clear(); failures.clear(); bubbleState.cards.clear(); bubbleState.closed.clear(); view = null; notes?.clear(); closeSelections();
     sync(); if (status) status.textContent = '页面或翻译设置已改变，请重新开始。';
   }
   function checkUrl() { if (url !== doc.location.href) { invalidate(); url = doc.location.href; } }
@@ -213,10 +271,17 @@ export function createFullTranslation({ doc = document, request = message => chr
   async function translate(retryOnly = false) {
     if (!reader) return;
     ensureUI(); checkUrl(); if (running || savingPreferences) return;
-    if (retryOnly && !failedTexts().length) { sync(); return; }
+    if (retryOnly && !failedTexts().length && !failedPageNumbers().length) { sync(); return; }
     closeSelections();
     running = true; const token = ++epoch, version = revision, requestUrl = url; sync();
     try {
+      // A display failure already has translated text; no API or credentials are needed.
+      if (retryOnly && reader.isPdf && !failedTexts().length) {
+        message('正在重试失败页，复用已有译文…');
+        await reader.pdfTranslation.retryFailedPages({ shouldContinue:() => token === epoch });
+        if (token === epoch) message(failedPageNumbers().length ? '仍有页面显示失败，可再次重试；已有译文保留。' : '失败页已恢复，未重复请求翻译。');
+        return;
+      }
       if (reader.prepareTranslation) await reader.prepareTranslation();
       if (token !== epoch) return;
       if (reader.isPdf) {
@@ -229,7 +294,7 @@ export function createFullTranslation({ doc = document, request = message => chr
       if (token !== epoch) return;
       if (!reply?.ok) throw new Error(reply?.message || '无法读取翻译设置。');
       const provider = reply.config.provider;
-      if (provider === 'deepseek' && !reply.hasKey) throw new Error('请填写 DeepSeek API Key，或切换到免费翻译。');
+      if (provider === 'deepseek' && !reply.hasKey && !(reader.isPdf && pdfGroups.length && pdfGroups.every(group => !pdfAllowed(group)))) throw new Error('请填写 DeepSeek API Key，或切换到免费翻译。');
       activeProvider = provider;
       const nextSignature = JSON.stringify([reply.config.source, reply.config.target, reply.config.model, reply.config.stylePrompt]);
       if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; void translate(); return; }
@@ -237,22 +302,33 @@ export function createFullTranslation({ doc = document, request = message => chr
       restoreTranslationGroups(website); website = reader.isPdf ? [] : collectTranslationGroups(doc.body, doc);
       if (!isReaderActive()) website = prioritizeWebsiteGroups(website, doc);
       if (!view) view = { id: crypto.randomUUID(), title: doc.title, language: doc.documentElement.lang, fullDocument: true,
-        context: sampleContext(reader.isPdf ? pdfGroups.map(group => group.source).join('\n\n') : isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n')) };
+        context: sampleContext(reader.isPdf ? pdfGroups.filter(pdfAllowed).map(group => group.source).join('\n\n') : isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n')) };
       if (reader) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); }
-      const groups = reader.isPdf ? pdfGroups : isReaderActive() ? readerGroups : website;
+      const groups = reader.isPdf ? pdfGroups.filter(pdfAllowed) : isReaderActive() ? readerGroups : website;
       const texts = [...new Set([...groups.flatMap(group => group.chunks), ...(retryOnly ? failedTexts(provider) : [])])];
-      if (!texts.length) throw new Error('当前视图没有可翻译的文字。');
+      if (!texts.length) {
+        if (reader.isPdf && reader.pdfTranslation?.state.originals.length) { view = null; message('所有可翻译文本框均已标记为原文，未发送翻译请求。'); return; }
+        throw new Error('当前视图没有可翻译的文字。');
+      }
       enabled = true; apply(website, false); apply(readerGroups, true); applyPdf();
-      const pending = retryOnly ? failedTexts(provider) : texts.filter(text => !cache.has(cacheKey(text)));
+      const wantsCards = provider === 'deepseek' && selectionPrefs.bubbleCards;
+      const pending = retryOnly ? failedTexts(provider) : texts.filter(text => {
+        const result = cache.get(cacheKey(text));
+        return !result || (wantsCards && (result.wordsLevel !== selectionPrefs.level || result.wordsExplanations !== selectionPrefs.explanations));
+      });
       let completed = texts.filter(text => cache.has(cacheKey(text))).length;
       let lastError = '';
       while (pending.length && token === epoch && doc.location.href === url) {
+        // A mark made during translation takes effect before the next request; duplicates still translate where unmarked.
+        for (let index = pending.length - 1; index >= 0; index--) if (!textAllowed(pending[index])) pending.splice(index,1);
+        if (!pending.length) break;
         const batch = []; let length = 0;
-        // One text run per message: stopping must not leave a queue of paid requests in the worker.
-        while (pending.length && batch.length < 1 && length + pending[0].length <= 2000) { const text = pending.shift(); batch.push(text); length += text.length; }
+        // Bubble mode combines up to four short runs into one request, with no queued next batch.
+        while (pending.length && batch.length < (wantsCards ? 4 : 1) && length + pending[0].length <= 2000) { const text = pending.shift(); batch.push(text); length += text.length; }
         message(`翻译中 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory 免费翻译' : 'DeepSeek'} · 可随时停止`);
         let result;
-        try { result = await request({ type: 'ezr:translation:full', provider, texts: batch, view }); }
+        try { result = await request({ type: 'ezr:translation:full', provider, texts: batch, view,
+          ...(wantsCards ? { excludeTerms:[...bubbleState.closed].map(key => JSON.parse(key)[0]).slice(0, 80) } : {}) }); }
         catch (error) { result = { ok:false, message:error?.message || '无法连接翻译服务，请重试。' }; }
         // Successful late results may be cached, but only the current run owns failure/UI state.
         if (doc.location.href !== requestUrl || revision !== version || signature !== nextSignature) return;
@@ -268,15 +344,18 @@ export function createFullTranslation({ doc = document, request = message => chr
           if (accepted.has(source)) failures.delete(id);
           else {
             lastError = result?.error || result?.message || '未收到有效译文，请重试。';
-            failures.set(id, { source, provider, message:lastError });
+            failures.set(id, { source, provider, message:lastError, cards:wantsCards, level:selectionPrefs.level, explanations:selectionPrefs.explanations });
           }
         }
-        completed += accepted.size;
+        completed = texts.filter(text => textAllowed(text) && cache.has(cacheKey(text))).length;
         apply(website, false); apply(readerGroups, true); applyPdf(); sync();
       }
       if (token === epoch) {
+        if (retryOnly && reader.isPdf) await reader.pdfTranslation.retryFailedPages({ shouldContinue:() => token === epoch });
+        if (token !== epoch) return;
         const failed = failedTexts(provider).length;
-        message(`已翻译 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'}${failed ? ' · ' + failed + ' 项失败，可点击「重试失败项」。' + (lastError ? ' ' + lastError : '') : ' · 切换视图复用结果'}`);
+        const retryLabel = reader.isPdf ? '重试失败页' : '重试失败项';
+        message(`已翻译 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'}${failed ? ' · ' + failed + ' 项失败，可点击「' + retryLabel + '」。' + (lastError ? ' ' + lastError : '') : ' · 切换视图复用结果'}`);
       }
     } catch (error) { if (token === epoch) message(error.message || '全文翻译失败，请重试。'); }
     finally { if (token === epoch) { running = false; sync(); } }
@@ -284,6 +363,9 @@ export function createFullTranslation({ doc = document, request = message => chr
   const storageChanged = (changes, area) => {
     if (area !== 'local' || !changes[TRANSLATION_KEY]) return;
     const next = normalizeTranslation(changes[TRANSLATION_KEY].newValue);
+    if (running && (next.bubbleCards !== selectionPrefs.bubbleCards || next.level !== selectionPrefs.level || next.explanations !== selectionPrefs.explanations)) {
+      epoch++; running = false; message('词卡设置已改变，已完成译文保留。切回原文后再次翻译即可继续。');
+    }
     const nextSignature = JSON.stringify([next.source, next.target, next.model, next.stylePrompt]);
     if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; }
     if (activeProvider !== next.provider) {
@@ -301,25 +383,33 @@ export function createFullTranslation({ doc = document, request = message => chr
   // SPA navigation must also invalidate a stopped or fully translated view.
   doc.defaultView.addEventListener?.('pagehide', () => { clearInterval(navigationTimer); chrome.storage.onChanged.removeListener(storageChanged); }, { once: true });
   return {
-    show() { if (!reader) return; ensureUI(); visible = true; place(); },
-    toggle() { if (!reader) return; ensureUI(); visible = !visible; place(); }, translate,
+    show() { if (reader) setToolbarVisible(true, true); },
+    toggle() { if (reader) setToolbarVisible(!visible, true); }, translate, setToolbarVisible,
     mainToolbarChanged() { sync(); },
     resetDocument() { invalidate(); signature = ''; },
     getView() { checkUrl(); return view; },
     isTranslatedSelection(range) { checkUrl(); return isTranslatedSelection(range, website) || isTranslatedSelection(range, readerGroups); },
-    addCards(cards, range) { return enabled && selectionPrefs.wordCards && selectionPrefs.enabled && notes ? notes.add(cards, range) : false; },
-    beforeRead() { originalSuspended = true; closeSelections(); restoreTranslationGroups(website); },
+    addCards(cards, range) {
+      for (const card of cards) if (!bubbleState.closed.has(bubbleKey(card))) bubbleState.cards.set(bubbleKey(card), card);
+      if (enabled && selectionPrefs.bubbleCards) { syncBubbles(); return true; }
+      return enabled && selectionPrefs.wordCards && selectionPrefs.enabled && notes ? notes.add(cards, range) : false;
+    },
+    beforeRead() { originalSuspended = true; closeSelections(); restoreTranslationGroups(website); syncBubbles(); },
     afterRead() { originalSuspended = false; if (enabled) apply(website, false); sync(); },
-    readerPaint() { notes?.clear(); if (reader && enabled) { readerGroups = collectReader(); apply(readerGroups, true); } },
+    readerPaint() { notes?.clear(); if (reader && enabled) { readerGroups = collectReader(); apply(readerGroups, true); } syncBubbles(); },
     bindReader(value) {
       reader = value; const style = make('style', 'ezr-full-style'); style.textContent = CSS; reader.root.appendChild(style);
+      unsubscribePdf?.(); unsubscribePdf = reader.pdfTranslation?.subscribe?.(sync);
       notes = createTranslationNotes({ ...value, doc, request });
+      bubbles = createBubbleCards({ ...value, doc, request, state:bubbleState, getSources:bubbleSources });
       readerGroups = enabled ? collectReader() : []; ensureUI(); apply(readerGroups, true); place();
     },
     unbindReader() {
-      epoch++; running = false; enabled = false; visible = false; closeSelections();
+      epoch++; running = false; enabled = false; closeSelections();
+      unsubscribePdf?.(); unsubscribePdf = null;
       restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); readerGroups = []; pdfGroups = []; reader?.pdfTranslation?.restore();
       notes?.destroy(); notes = null; originalSelection?.destroy(); originalSelection = null;
+      bubbles?.destroy(); bubbles = null;
       originalRoot?.remove(); originalRoot = null; bar?.remove(); bar = null; status = null; reader = null;
     },
     previewChanged() {
@@ -333,8 +423,9 @@ export function createFullTranslation({ doc = document, request = message => chr
       else apply(website, false);
       place();
     },
-    get isSelectionOpen() { return !!originalSelection?.isOpen; },
-    closeSelection() { originalSelection?.close(); },
+    get isToolbarVisible() { return !!reader && !!bar && !bar.hidden; },
+    get isSelectionOpen() { return !!originalSelection?.isOpen || !!bubbles?.isOpen; },
+    closeSelection() { originalSelection?.close(); bubbles?.minimize(); },
     get state() { return { enabled, running, bilingual, cached: cache.size, failed: failedTexts().length }; },
   };
 }

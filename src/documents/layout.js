@@ -67,6 +67,23 @@ export function containsBaseline(box, x, y) {
   return px >= box.x - slack && px <= box.x + box.width + slack && py >= box.y - slack && py <= box.y + box.height + slack;
 }
 
+/** Overlapping formulas need the nearest glyph baseline, not the first enclosing paragraph. */
+export function findTextBox(boxes, x, y) {
+  let best, distance = Infinity;
+  for (const box of boxes) {
+    const cos = Math.cos(box.angle), sin = Math.sin(box.angle);
+    const px = x * cos + y * sin, py = -x * sin + y * cos;
+    for (const item of box.items) {
+      const dx = Math.max(item.x - px, 0, px - item.x - item.width);
+      const dy = Math.abs(py - item.baseline);
+      if (dx > item.fontSize * .35 || dy > item.fontSize * .35) continue;
+      const score = Math.hypot(dx,dy) / item.fontSize;
+      if (score < distance) { best = box; distance = score; }
+    }
+  }
+  return best;
+}
+
 const graphemes = new Intl.Segmenter(undefined, { granularity:'grapheme' });
 export function wrapText(text, width, measure) {
   const lines = [];

@@ -18666,7 +18666,7 @@ class CanvasGraphics {
   showText(opIdx, glyphs) {
     // EZ-Reader: suppress painting only; retain text advances and graphics state.
     const visible = this.contentVisible;
-    if (this.textFilter && visible) {
+    if (this.textFilter && visible && (this.current.font.isType3Font || this.current.font.isInvalidPDFjsFont)) {
       const current = this.current;
       const transform = getCurrentTransform(this.ctx);
       const matrix = current.textMatrix ? Util.transform(transform, current.textMatrix) : transform;
@@ -18813,7 +18813,14 @@ class CanvasGraphics {
           scaledX += (width - measuredWidth) / 2000 * fontSize / fontSizeScale;
         }
       }
-      if (this.contentVisible && (glyph.isInFont || font.missingFile)) {
+      // EZ-Reader: one PDF text operation can span several extracted text boxes.
+      const ezrPoint = [scaledX, scaledY];
+      Util.applyTransform(ezrPoint, getCurrentTransform(ctx));
+      const ezrGlyphVisible = this.contentVisible && (!this.textFilter || this.textFilter({
+        x:ezrPoint[0], y:ezrPoint[1], text:glyph.unicode || "",
+        color:current.fillColor, fontName:font.name
+      }) !== false);
+      if (ezrGlyphVisible && (glyph.isInFont || font.missingFile)) {
         if (simpleFillText && !accent) {
           ctx.fillText(character, scaledX, scaledY);
           this.dependencyTracker?.recordCharacterBBox(opIdx, ctx, measure ? {

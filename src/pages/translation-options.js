@@ -26,6 +26,7 @@ function render(reply) {
   byId('translation-preload').checked = current.preload;
   byId('translation-explanations').checked = current.explanations;
   byId('translation-word-cards').checked = current.wordCards;
+  byId('translation-bubble-cards').checked = current.bubbleCards;
   byId('translation-auto-save').checked = current.autoSave;
   byId('translation-level').value = current.level;
   dependencies();
@@ -35,7 +36,7 @@ function render(reply) {
 }
 function dependencies() {
   byId('translation-auto-save').disabled = !byId('translation-word-cards').checked;
-  byId('translation-level').disabled = !byId('translation-word-cards').checked && !byId('translation-explanations').checked;
+  byId('translation-level').disabled = !byId('translation-word-cards').checked && !byId('translation-explanations').checked && !byId('translation-bubble-cards').checked;
 }
 async function act(action, success) {
   busy = true;
@@ -61,6 +62,7 @@ fill('translation-model', MODELS.map(model => [model, model === 'deepseek-flash'
 fill('translation-provider', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
 fill('translation-level', ENGLISH_LEVELS);
 byId('translation-word-cards').addEventListener('change', dependencies);
+byId('translation-bubble-cards').addEventListener('change', dependencies);
 byId('translation-explanations').addEventListener('change', dependencies);
 byId('translation-save').addEventListener('click', () => act(async () => {
   const message = { type: 'ezr:translation:save', config: {
@@ -69,6 +71,7 @@ byId('translation-save').addEventListener('click', () => act(async () => {
     provider: byId('translation-provider').value, preload: byId('translation-preload').checked,
     explanations: byId('translation-explanations').checked,
     wordCards: byId('translation-word-cards').checked, autoSave: byId('translation-auto-save').checked,
+    bubbleCards: byId('translation-bubble-cards').checked,
     level: byId('translation-level').value,
   } };
   const key = byId('translation-key').value.trim();

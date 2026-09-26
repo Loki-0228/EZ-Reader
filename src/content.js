@@ -56,7 +56,21 @@ function bootstrap() {
   let restoreAfterPick = null;
   let busy = false;
   let lifecycle = 0, windowRevision = -1, toolbarWindowId = null, windowClosing = false, windowManaged = false;
-  const fullTranslation = createFullTranslation({ doc, isReaderActive: () => !!session && !session.previewing });
+  let toolbarStateReady = Promise.resolve(null), translationVisibilityInitialized = false;
+  const fullTranslation = createFullTranslation({ doc, isReaderActive: () => !!session && !session.previewing,
+    onVisibilityChange: visible => {
+      translationVisibilityInitialized = true;
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        void chrome.runtime.sendMessage({ type:'ezr:window-toolbar:translation', visible }).catch(() => {});
+      }
+    } });
+  function restoreTranslationVisibility(state, force = false) {
+    if (!state?.ok && !state?.configured) return;
+    if (force || !translationVisibilityInitialized) {
+      translationVisibilityInitialized = true;
+      fullTranslation.setToolbarVisible(state.translationVisible === true);
+    }
+  }
   const originalCapitalization = createOriginalCapitalization(doc);
 
   /* -------------------------------------------------------------- persistence */
@@ -114,7 +128,8 @@ function bootstrap() {
     async load() {
       await readPersisted.call(this);
       this.resolved = normalizeSettings({ ...resolveSettings(this.defaults, this.byOrigin, origin),
-        toolbarDock: this.defaults.toolbarDock, translationToolbarDock: this.defaults.translationToolbarDock });
+        toolbarDock: this.defaults.toolbarDock, translationToolbarDock: this.defaults.translationToolbarDock,
+        toolFontScale: this.defaults.toolFontScale });
       return this.resolved;
     },
 
@@ -145,8 +160,15 @@ function bootstrap() {
       if (options.transient) return next;
 
       if (next.rememberPerSite) {
-        this.byOrigin[origin] = { ...(this.byOrigin[origin] || {}), ...patch };
-        await storage.write('ezr:settings:byOrigin', this.byOrigin);
+        const sitePatch = { ...patch }; delete sitePatch.toolFontScale;
+        if (Object.hasOwn(patch,'toolFontScale')) {
+          this.defaults = normalizeSettings({ ...this.defaults, toolFontScale:next.toolFontScale });
+          await storage.write(storageKeyFor('', 'settings'), this.defaults);
+        }
+        if (Object.keys(sitePatch).length) {
+          this.byOrigin[origin] = { ...(this.byOrigin[origin] || {}), ...sitePatch };
+          await storage.write('ezr:settings:byOrigin', this.byOrigin);
+        }
       } else {
         this.defaults = next;
         await storage.write(storageKeyFor('', 'settings'), next);
@@ -205,6 +227,21 @@ function bootstrap() {
   };
 
   /* ------------------------------------------------------------------- toasts */
+  // Tool typography is global even when article settings are remembered per site.
+  if (hasStorage && chrome.storage.onChanged) {
+    const syncToolFont = (changes, area) => {
+      const value = changes[storageKeyFor('', 'settings')];
+      if (area !== 'local' || !value) return;
+      const scale = normalizeSettings(value.newValue).toolFontScale;
+      settingsStore.defaults.toolFontScale = scale;
+      if (settingsStore.resolved.toolFontScale === scale) return;
+      settingsStore.resolved = { ...settingsStore.resolved, toolFontScale:scale };
+      session?.applySettings(settingsStore.resolved);
+      if (isDocumentReader) doc.documentElement.style.setProperty('--ezr-tool-size', String(13 * scale) + 'px');
+    };
+    chrome.storage.onChanged.addListener(syncToolFont);
+    doc.defaultView?.addEventListener?.('pagehide', () => chrome.storage.onChanged.removeListener(syncToolFont), {once:true});
+  }
 
   /**
    * Standalone toast, usable before a session exists. Kept self-contained so it
@@ -256,6 +293,7 @@ function bootstrap() {
   function createSession(irDoc, settings, original = false) {
     // Keep the source DOM, styles and event handlers in place, including on re-selection.
     const shell = mount({ doc, settings, onClose: () => close() });
+    if (isDocumentReader) doc.documentElement.style.setProperty('--ezr-tool-size', String(13 * settings.toolFontScale) + 'px');
     // `mount()` exposes the outline as `outlineHost` (an <aside class="ezr-outline">);
     // the reader chrome keeps the SHORT name so the handler code below stays readable.
     shell.outline = shell.outlineHost;
@@ -286,7 +324,7 @@ function bootstrap() {
         settingsStore.update(patch);
       },
       onReset: () => {
-        if (previewing) settingsStore.update({ theme: DEFAULT_SETTINGS.theme, capitalizeFirst: DEFAULT_SETTINGS.capitalizeFirst, rememberPerSite: DEFAULT_SETTINGS.rememberPerSite });
+        if (previewing) settingsStore.update({ theme: DEFAULT_SETTINGS.theme, capitalizeFirst: DEFAULT_SETTINGS.capitalizeFirst, rememberPerSite: DEFAULT_SETTINGS.rememberPerSite, toolFontScale:DEFAULT_SETTINGS.toolFontScale });
         else settingsStore.reset();
       },
     });
@@ -503,12 +541,15 @@ function bootstrap() {
       /** @param {object} nextSettings */
       applySettings(nextSettings) {
         const dockOnly = Object.keys(nextSettings).every(key =>
-          key === 'toolbarDock' || key === 'translationToolbarDock' || nextSettings[key] === appliedSettings[key]);
+          key === 'toolbarDock' || key === 'translationToolbarDock' || key === 'toolFontScale' || nextSettings[key] === appliedSettings[key]);
         appliedSettings = { ...nextSettings };
         shell.setDock(nextSettings.toolbarDock);
         shell.setTranslationDock(nextSettings.translationToolbarDock);
         toolbar.update(nextSettings);
         fullTranslation.mainToolbarChanged();
+        shell.root.style.setProperty('--ezr-tool-size', String(13 * nextSettings.toolFontScale) + 'px');
+        if (isDocumentReader) doc.documentElement.style.setProperty('--ezr-tool-size', String(13 * nextSettings.toolFontScale) + 'px');
+        settingsPanel.update(nextSettings);
         // Moving either bar preserves selections, translated nodes and pending requests.
         if (dockOnly) return;
         applyVars(shell.root, nextSettings);
@@ -721,23 +762,28 @@ function bootstrap() {
     return { ok: true };
   }
 
-  async function showToolbar(revealMain = true) {
+  async function showToolbar(revealMain = true, toolbarState = null) {
     if (session && session.documentUrl !== doc.location.href) close();
     if (session) { if (revealMain) session.showMainToolbar(); return { ok: true, already: true }; }
     const generation = ++lifecycle;
-    const settings = await settingsStore.load();
+    // A pushed state already owns the background's window queue; querying that queue here would deadlock.
+    const [settings, state] = await Promise.all([settingsStore.load(), toolbarState || toolbarStateReady]);
     if (generation !== lifecycle) return { ok: false, reason: 'cancelled' };
+    restoreTranslationVisibility(state);
     session = createSession({ title: doc.title, blocks: [], srcPath: null }, settings, true);
     return { ok: true };
   }
 
   async function applyToolbarState(state) {
     if (!state.configured) return { ok: true };
-    if (toolbarWindowId !== state.windowId) { windowRevision = -1; toolbarWindowId = state.windowId; windowClosing = false; }
+    if (toolbarWindowId !== state.windowId) {
+      windowRevision = -1; toolbarWindowId = state.windowId; windowClosing = false;
+      restoreTranslationVisibility(state, true);
+    }
     if (state.revision < windowRevision || (windowClosing && state.revision <= windowRevision)) return { ok: true, stale: true };
     const revealMain = state.revision > windowRevision;
     windowRevision = state.revision; windowClosing = false;
-    if (state.enabled) { windowManaged = true; return showToolbar(revealMain); }
+    if (state.enabled) { windowManaged = true; return showToolbar(revealMain, state); }
     // Window synchronization owns only sessions it opened, not local automation/debug sessions.
     if (windowManaged) close();
     windowManaged = false; return { ok: true };
@@ -786,6 +832,7 @@ function bootstrap() {
           topFrame: isTopFrame,
           active: !!session,
           toolbarVisible: !!session?.mainToolbarVisible,
+          toolbarsVisible: !!session && (session.mainToolbarVisible || fullTranslation.isToolbarVisible),
           picking: !!activePicker,
           previewing: !!session?.previewing,
           blocks: session ? session.shell.article.children.length : 0,
@@ -962,10 +1009,14 @@ function bootstrap() {
   };
 
   if (!isTopFrame) void settingsStore.load();
-  else if (!isDocumentReader && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+  else if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     const generation = lifecycle;
-    void chrome.runtime.sendMessage({ type: 'ezr:window-toolbar:get' }).then(state => {
-      if (state?.ok && generation === lifecycle) return applyToolbarState(state);
+    toolbarStateReady = chrome.runtime.sendMessage({ type: 'ezr:window-toolbar:get' }).catch(() => null);
+    void toolbarStateReady.then(state => {
+      if (state?.ok && generation === lifecycle) {
+        if (isDocumentReader) restoreTranslationVisibility(state);
+        else return applyToolbarState(state);
+      }
     }).catch(() => {});
   }
 }

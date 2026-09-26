@@ -100,7 +100,7 @@ export function createSettingsPanel(container, opts = {}) {
   /** 触发 onChange（立即，用于下拉/勾选框/按钮）。 @param {Object} partial 变更。 */
   const emit = (partial) => {
     if (destroyed || !partial) return;
-    if (previewing && Object.keys(partial).some(key => !['theme', 'capitalizeFirst', 'rememberPerSite'].includes(key))) return;
+    if (previewing && Object.keys(partial).some(key => !['theme', 'capitalizeFirst', 'rememberPerSite', 'toolFontScale'].includes(key))) return;
     if (typeof opts.onChange !== 'function') return;
     try {
       opts.onChange(partial);
@@ -330,6 +330,10 @@ export function createSettingsPanel(container, opts = {}) {
 
   // 视图
   const display = section('03', '显示');
+  display.appendChild(rangeRow({ key:'toolFontScale', label:'工具字体缩放',
+    min:SETTING_LIMITS.toolFontScale.min, max:SETTING_LIMITS.toolFontScale.max, step:.05,
+    format:v => `${Math.round(v * 100)}%` }));
+  display.appendChild(make('p', 'ezr-field-description', '阅读、翻译和 PDF 编辑工具栏共用，字号与工具栏高度同步变化。'));
   const zoomField = selectRow({ key: 'zoomMode', label: '缩放模式', options: ZOOM_MODES });
   display.appendChild(zoomField);
   const themeField = make('div', 'ezr-field');

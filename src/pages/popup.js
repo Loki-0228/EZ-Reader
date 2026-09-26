@@ -11,26 +11,31 @@ let showing = false;
 function status(text) { notice.textContent = text; notice.hidden = !text; }
 function updateToolbarButton(state) {
   toolbarEnabled = state.enabled === true;
-  // 主栏被 × 藏掉或尚未显示时，按钮回到「打开」语义，与页面上看到的一致。
+  // 两栏都被 × 关闭时恢复打开入口；页面不可达时保留关闭入口。
   showing = toolbarEnabled && (toolbarVisible === null ? true : toolbarVisible);
   buttonLabel.textContent = showing ? '关闭工具栏' : nativeDocument ? '打开 PDF 工具栏' : '网页工具栏';
   button.title = showing ? '关闭当前浏览器窗口内的网页工具栏'
     : toolbarEnabled && !nativeDocument ? '重新显示网页工具栏' : buttonLabel.textContent;
 }
 async function probeToolbarVisible() {
-  // 每个 frame 都应答 ezr:status，只认主框架的应答，其余再问一次。
-  for (let ask = 0; ask < 3; ask++) {
-    let reply = null;
-    try { reply = await chrome.tabs.sendMessage(tabId, { type: 'ezr:status' }); } catch { return null; }
-    if (reply?.topFrame) return reply.toolbarVisible === true;
-    if (!reply?.ok) return null;
-  }
-  return null;
+  let timeout;
+  try {
+    // 只查询主框架，避免 iframe 抢先应答后误用窗口开关状态。
+    const reply = await Promise.race([
+      chrome.tabs.sendMessage(tabId, { type: 'ezr:status' }, { frameId: 0 }),
+      new Promise(resolve => { timeout = setTimeout(() => resolve(null), 1500); }),
+    ]);
+    if (!reply?.ok || !reply.topFrame || !reply.active) return null;
+    if (typeof reply.toolbarsVisible === 'boolean') return reply.toolbarsVisible;
+    // 兼容尚未刷新的页面；无法确认可见性时保留菜单关闭入口。
+    return typeof reply.toolbarVisible === 'boolean' ? reply.toolbarVisible : null;
+  } catch { return null; }
+  finally { clearTimeout(timeout); }
 }
 async function readToolbarState() {
   const reply = await chrome.runtime.sendMessage({type:'ezr:window-toolbar:get',tabId});
   if (!reply?.ok) throw new Error(reply?.message || '无法读取工具栏状态，请重新打开扩展面板。');
-  toolbarVisible = await probeToolbarVisible();
+  toolbarVisible = reply.enabled ? await probeToolbarVisible() : false;
   updateToolbarButton(reply);
 }
 async function init() {
@@ -59,6 +64,7 @@ button.addEventListener('click', async () => {
     const reply = await chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',tabId,enabled});
     if (!reply?.ok) throw new Error(reply?.message || (enabled ? '工具栏未能打开，请重试。' : '工具栏未能关闭，请重试。'));
     // The switch is saved even if the current page cannot display the toolbar.
+    toolbarVisible = null;
     updateToolbarButton(reply);
     if (enabled && !reply.available) {
       throw new Error('当前网页无法显示工具栏，可点击「关闭工具栏」停止启用，或检查扩展的网站访问权限后重试。');

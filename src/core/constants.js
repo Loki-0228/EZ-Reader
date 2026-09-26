@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   showOutline: false,
   toolbarDock: 'top',      // 阅读工具栏停靠边缘
   translationToolbarDock: 'top', // 翻译工具栏独立停靠边缘
+  toolFontScale: 1,        // 工具栏字号倍率，所有网站共用
   // 行为
   rememberPerSite: true,
   restorePosition: true,
@@ -87,6 +88,7 @@ export const SETTING_LIMITS = Object.freeze({
   gapExtraPx: Object.freeze({ min: 0, max: 24 }),
   measure: Object.freeze({ min: 24, max: 90 }),
   zoom: Object.freeze({ min: 0.6, max: 2.5 }),
+  toolFontScale: Object.freeze({ min: 0.75, max: 1.75 }),
 });
 
 /** Noise hints (navigation, footer, sharing, ads…) for candidate scoring. @type {RegExp} */

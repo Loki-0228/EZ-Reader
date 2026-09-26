@@ -21,16 +21,29 @@ const toolbar = () => globalThis.__ezr.send({ type:'ezr:toolbar-open' });
 const exportButton = document.getElementById('pdf-export');
 const editButton = document.getElementById('pdf-batch-edit'), editControls = document.getElementById('pdf-edit-controls');
 const sizeInput = document.getElementById('pdf-edit-font-size');
+const sizeDragButton = document.getElementById('pdf-edit-size-drag');
+const horizontalInput = document.getElementById('pdf-edit-horizontal'), verticalInput = document.getElementById('pdf-edit-vertical');
+let sizeDrag = null, lastEditSize = 16;
+function endSizeDrag() {
+  const pointer = sizeDrag?.pointer; sizeDrag = null;
+  if (pointer !== undefined && sizeDragButton.hasPointerCapture(pointer)) sizeDragButton.releasePointerCapture(pointer);
+}
 function setText(node,text) { if (node.textContent !== text) node.textContent = text; }
 function editChanged(state) {
   editButton.hidden = !state.available; editButton.setAttribute('aria-pressed',String(state.active));
   editControls.hidden = !state.active;
-  setText(document.getElementById('pdf-edit-count'),'已选 ' + state.selected.length + ' 个文本框');
-  for (const id of ['pdf-edit-font-size','pdf-edit-apply','pdf-edit-reset','pdf-edit-clear']) document.getElementById(id).disabled = !state.selected.length;
+  setText(document.getElementById('pdf-edit-count'),'已选 ' + state.selected.length + ' 个文本框' + (state.originalSelected ? ' · ' + state.originalSelected + ' 个原文标记' : ''));
+  for (const id of ['pdf-edit-font-size','pdf-edit-size-drag','pdf-edit-horizontal','pdf-edit-vertical','pdf-edit-reset']) document.getElementById(id).disabled = !state.editable;
+  document.getElementById('pdf-edit-clear').disabled = !state.selected.length;
+  document.getElementById('pdf-edit-original').disabled = state.selected.length <= state.originalSelected;
+  document.getElementById('pdf-edit-unmark').disabled = !state.originalSelected;
+  if (!state.active || !state.editable) endSizeDrag();
+  if (Number.isFinite(state.fontSize)) lastEditSize = state.fontSize;
+  horizontalInput.value = state.horizontal; verticalInput.value = state.vertical;
   sizeInput.placeholder = state.mixed ? '多种字号' : '字号';
   if (document.activeElement !== sizeInput) sizeInput.value = state.fontSize === null ? '' : String(Math.round(state.fontSize * 10) / 10);
   setText(document.getElementById('pdf-edit-hint'),state.overflow ? state.overflow + ' 个文本框的译文超出原框，文字已完整保留；可减小字号或恢复自动字号。'
-    : '点击单选，拖动框选；Ctrl / Shift 点击可增减选择。Esc 退出。');
+    : '拖动框选公式后可「标记为原文」，保留原字形与排版。字号与对齐只改译文；上下拖动可调字号。Ctrl / Shift 增减选择，Esc 退出。');
 }
 function syncEditAvailability() {
   const host = document.getElementById('ezr-root');
@@ -39,22 +52,58 @@ function syncEditAvailability() {
 let exporting = false;
 const pdfTranslation = createPdfTranslation({ viewer, eventBus, container,
   getPdf:() => documentJob?.pdf, prepare:() => globalThis.__ezrPreparePdf(),
-  onError:message, onEditChange:editChanged, onChange:(translated,total) => {
-    exportButton.disabled = exporting || !translated;
-    document.getElementById('pdf-translation-count').textContent = total ? translated + ' / ' + total + ' 个文本框已翻译' : '';
+  onError:message, onEditChange:editChanged, onChange:(translated,total,originals = 0) => {
+    exportButton.disabled = exporting || (!translated && !originals);
+    document.getElementById('pdf-translation-count').textContent = (total ? translated + ' / ' + total + ' 个文本框已翻译' : '') + (originals ? ' · ' + originals + ' 个保留原文' : '');
     syncEditAvailability();
   } });
 globalThis.__ezrPdfTranslation = pdfTranslation;
-editButton.addEventListener('click',() => pdfTranslation.setEditing(!pdfTranslation.state.editing));
+editButton.addEventListener('click',async () => {
+  if (editButton.disabled) return;
+  if (pdfTranslation.state.editing) { pdfTranslation.setEditing(false); return; }
+  if (pdfTranslation.state.pages) { pdfTranslation.setEditing(true); return; }
+  editButton.disabled = true;
+  try { await pdfTranslation.prepare(); pdfTranslation.setEditing(true); }
+  catch (error) { message(error.message); }
+  finally { editButton.disabled = false; }
+});
+document.getElementById('pdf-edit-original').addEventListener('click',() => pdfTranslation.markOriginal(true));
+document.getElementById('pdf-edit-unmark').addEventListener('click',() => pdfTranslation.markOriginal(false));
 document.getElementById('pdf-edit-done').addEventListener('click',() => { pdfTranslation.setEditing(false); editButton.focus(); });
 document.getElementById('pdf-edit-clear').addEventListener('click',() => pdfTranslation.clearSelection());
 document.getElementById('pdf-edit-reset').addEventListener('click',() => pdfTranslation.applyFontSize(null));
-function applySize() {
+function applySize(report = false) {
+  if (!sizeInput.value || !sizeInput.validity.valid) { if (report) message('字号请输入 1 到 144 之间的数值。'); return; }
   try { pdfTranslation.applyFontSize(Number(sizeInput.value)); }
   catch (error) { message(error.message); }
 }
-document.getElementById('pdf-edit-apply').addEventListener('click',applySize);
-sizeInput.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); applySize(); } });
+sizeInput.addEventListener('input',() => applySize());
+sizeInput.addEventListener('change',() => applySize(true));
+sizeInput.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); applySize(true); } });
+horizontalInput.addEventListener('change',() => pdfTranslation.applyAlignment('horizontal',horizontalInput.value));
+verticalInput.addEventListener('change',() => pdfTranslation.applyAlignment('vertical',verticalInput.value));
+function dragSize(value) {
+  sizeInput.value = String(Math.round(Math.min(144,Math.max(1,value)) * 10) / 10);
+  applySize();
+}
+sizeDragButton.addEventListener('pointerdown',event => {
+  if (event.button !== 0 || sizeDrag || sizeDragButton.disabled) return;
+  event.preventDefault(); sizeDragButton.focus();
+  sizeDrag = {pointer:event.pointerId,y:event.clientY,size:Number(sizeInput.value) || lastEditSize};
+  sizeDragButton.setPointerCapture(event.pointerId);
+});
+document.addEventListener('pointermove',event => {
+  if (!sizeDrag || event.pointerId !== sizeDrag.pointer) return;
+  event.preventDefault(); dragSize(sizeDrag.size + (sizeDrag.y - event.clientY) * (event.shiftKey ? 1 : .2));
+},{capture:true,signal:controller.signal});
+document.addEventListener('pointerup',event => { if (sizeDrag?.pointer === event.pointerId) endSizeDrag(); },{capture:true,signal:controller.signal});
+sizeDragButton.addEventListener('pointercancel',endSizeDrag);
+sizeDragButton.addEventListener('lostpointercapture',endSizeDrag);
+window.addEventListener('blur',endSizeDrag,{signal:controller.signal});
+sizeDragButton.addEventListener('keydown',event => {
+  if (!['ArrowUp','ArrowDown'].includes(event.key)) return;
+  event.preventDefault(); dragSize((Number(sizeInput.value) || lastEditSize) + (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 1 : .1));
+});
 exportButton.addEventListener('click',async () => {
   if (exporting) return;
   const target = window.open('about:blank','_blank');
@@ -64,13 +113,35 @@ exportButton.addEventListener('click',async () => {
     await pdfTranslation.exportPreview(target,(current,total) => message('正在准备导出：' + current + ' / ' + total + ' 页'));
     message('导出预览已打开。点击「打印 / 保存为 PDF」，选择「另存为 PDF」。');
   } catch (error) { target.close(); message(error.message); }
-  finally { exporting = false; exportButton.disabled = !pdfTranslation.state.translated; }
+  finally { exporting = false; exportButton.disabled = !pdfTranslation.state.translated && !pdfTranslation.state.originals.length; }
 });
 function busy(value) { fileInput.disabled = value; document.getElementById('cancel-load').hidden = !value; }
-eventBus.on('pagesinit', () => { viewer.currentScaleValue = 'page-width'; });
-eventBus.on('pagechanging', ({ pageNumber }) => { pageInput.value = pageNumber; });
+let fitMode = 'page-width', fitFrame = 0;
+function fitPage() {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = 0;
+  if (!documentJob || !viewer.pagesCount || !container.clientHeight) return;
+  const pageNumber = viewer.currentPageNumber, previousScale = viewer.currentScale;
+  viewer.currentScaleValue = fitMode;
+  // Preset scaling may restore a stale PDF.js location from the preceding page.
+  if (viewer.currentScale !== previousScale && (fitMode === 'page-height' || viewer.currentPageNumber !== pageNumber)) viewer.currentPageNumber = pageNumber;
+}
+function scheduleFit() { if (!fitFrame) fitFrame = requestAnimationFrame(fitPage); }
+for (const [id, mode] of [['pdf-fit','page-width'], ['pdf-fit-height','page-height']]) {
+  document.getElementById(id).addEventListener('click', () => {
+    fitMode = mode;
+    document.getElementById('pdf-fit').setAttribute('aria-pressed', String(mode === 'page-width'));
+    document.getElementById('pdf-fit-height').setAttribute('aria-pressed', String(mode === 'page-height'));
+    fitPage();
+    if (documentJob) viewer.currentPageNumber = viewer.currentPageNumber;
+  });
+}
+// PDFViewer measures its container but does not reapply the preset on resize.
+const viewportResize = new ResizeObserver(scheduleFit); viewportResize.observe(container);
+eventBus.on('pagesinit', scheduleFit);
+eventBus.on('pagesloaded', scheduleFit);
+eventBus.on('pagechanging', ({ pageNumber }) => { pageInput.value = pageNumber; scheduleFit(); });
 pageInput.addEventListener('change', () => { if (documentJob) viewer.currentPageNumber = Math.max(1, Math.min(documentJob.pdf.numPages, Number(pageInput.value) || 1)); });
-document.getElementById('pdf-fit').addEventListener('click', () => { if (documentJob) viewer.currentScaleValue = 'page-width'; });
 document.getElementById('open-toolbar').addEventListener('click', () => { void toolbar(); });
 document.getElementById('cancel-load').addEventListener('click', () => loadController?.abort());
 async function fetchBytes(url, signal) {
@@ -153,7 +224,7 @@ function fitTools() {
   }
 }
 const mutations = new MutationObserver(fitTools); mutations.observe(document.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['data-ezr-original','data-ezr-dock','data-ezr-translation-dock'] });
-window.addEventListener('pagehide', () => { generation++; loadController?.abort(); pdfTranslation.destroy(); controller.abort(); mutations.disconnect(); resize.disconnect(); navigationResize.disconnect(); globalThis.__ezr.close(); void documentJob?.destroy().catch(() => {}); });
+window.addEventListener('pagehide', () => { generation++; cancelAnimationFrame(fitFrame); viewportResize.disconnect(); loadController?.abort(); pdfTranslation.destroy(); controller.abort(); mutations.disconnect(); resize.disconnect(); navigationResize.disconnect(); globalThis.__ezr.close(); void documentJob?.destroy().catch(() => {}); });
 async function init() {
   const id = location.hash.slice(1);
   if (!/^[\da-f-]{36}$/i.test(id)) { message('从 PDF 页面点击扩展的「打开 PDF」，或选择本地 PDF 文件。'); return; }

@@ -13,14 +13,16 @@ export function normalizeVocabulary(raw, text, { target, level, explanations = t
     const term = item.term.trim().replace(/\s+/g, ' ');
     const match = new RegExp(`(?<![\\p{L}\\p{N}])${term.split(' ').map(escapeRegex).join('\\s+')}(?![\\p{L}\\p{N}])`, 'iu').exec(text);
     if (!match || seen.has(term.toLowerCase())) continue;
-    seen.add(term.toLowerCase());
     const before = text.slice(0, match.index), tail = text.slice(match.index);
     const start = Math.max(before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf('\n')) + 1;
     const end = tail.search(/[.!?\n]/);
     const sentence = text.slice(Math.max(start, match.index - 100), match.index + (end >= 0 ? end + 1 : 180)).trim();
     const fields = explanations ? item : { term: item.term, translation: item.translation };
-    words.push(normalizeWordCard({ ...fields, term: match[0].replace(/\s+/g, ' '), provider: 'ai', level,
-      sourceLanguage: 'en', targetLanguage: target, sourceSentence: sentence, pageUrl: '', dictionaryUrl: '', license: '', licenseUrl: '' }));
+    try {
+      words.push(normalizeWordCard({ ...fields, term: match[0].replace(/\s+/g, ' '), provider: 'ai', level,
+        sourceLanguage: 'en', targetLanguage: target, sourceSentence: sentence, pageUrl: '', dictionaryUrl: '', license: '', licenseUrl: '' }));
+      seen.add(term.toLowerCase());
+    } catch { continue; }
     if (words.length === MAX_VOCABULARY_WORDS) break;
   }
   return words;

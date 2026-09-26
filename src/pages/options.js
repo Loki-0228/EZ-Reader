@@ -35,7 +35,7 @@ const SKIP_TOKEN_RE = /(:\/\/|^www\.|@)/i;
 const WORD_RE = /\p{L}[\p{L}\p{N}'’-]*/gu;
 
 /** Numeric settings, edited by range inputs. */
-const NUMERIC_KEYS = ['bodyFontSize', 'lineHeight', 'gapFactor', 'measure', 'zoom'];
+const NUMERIC_KEYS = ['bodyFontSize', 'lineHeight', 'gapFactor', 'measure', 'zoom', 'toolFontScale'];
 
 /** Boolean settings, edited by checkboxes. */
 const BOOLEAN_KEYS = ['capitalizeFirst', 'splitLines', 'restorePosition', 'rememberPerSite', 'showOutline'];
@@ -466,6 +466,9 @@ function updateReadouts(settings, vars) {
   if (els.outGapInline) els.outGapInline.textContent = `${gapPx.toFixed(1)}px`;
   if (els.outMeasure) els.outMeasure.textContent = `${measure}rem`;
   if (els.outZoom) els.outZoom.textContent = `${Math.round(zoom * 100)}%`;
+  const toolScale = document.getElementById('out-tool-font-scale');
+  if (toolScale) toolScale.textContent = `${Math.round(settings.toolFontScale * 100)}%`;
+  document.getElementById('tool-font-preview')?.style.setProperty('font-size', `${13 * settings.toolFontScale}px`);
 
   if (els.outFont) {
     const first = safeFontStack(settings.fontId).split(',')[0] || '';

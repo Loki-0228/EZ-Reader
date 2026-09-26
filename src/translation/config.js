@@ -11,7 +11,7 @@ export const ENGLISH_LEVELS = Object.freeze([
   ['B2', 'B2 · 中高级'], ['C1', 'C1 · 高级'], ['C2', 'C2 · 熟练'],
 ]);
 export const TRANSLATION_DEFAULTS = Object.freeze({ enabled: true, source: 'auto', target: 'zh-CN', textTarget: 'zh-CN', model: 'deepseek-flash',
-  provider: 'free', preload: false, explanations: true, wordCards: true, autoSave: false, level: 'B1', stylePrompt: '' });
+  provider: 'free', preload: false, explanations: true, wordCards: true, bubbleCards: false, autoSave: false, level: 'B1', stylePrompt: '' });
 export const MAX_SELECTION = 2000;
 export const MAX_CONTEXT = 12000;
 /** Upper bound for the user's translation-style instruction. */
@@ -29,6 +29,7 @@ export function normalizeTranslation(raw = {}) {
     preload: raw.preload === true,
     explanations: typeof raw.explanations === 'boolean' ? raw.explanations : true,
     wordCards: typeof raw.wordCards === 'boolean' ? raw.wordCards : true,
+    bubbleCards: raw.bubbleCards === true,
     autoSave: raw.autoSave === true,
     level: ENGLISH_LEVELS.some(([value]) => raw.level === value) ? raw.level : 'B1',
     stylePrompt: typeof raw.stylePrompt === 'string' ? raw.stylePrompt.trim().slice(0, MAX_STYLE_PROMPT) : '',

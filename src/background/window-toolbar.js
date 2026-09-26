@@ -10,7 +10,8 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
   };
   const read = async id => {
     const state = (await api.storage.session.get(keyOf(id)))[keyOf(id)];
-    return { configured: !!state, enabled: !!state?.enabled, revision: state?.revision || 0, windowId: id };
+    return { configured: typeof state?.enabled === 'boolean', enabled: !!state?.enabled,
+      translationVisible: state?.translationVisible === true, revision: state?.revision || 0, windowId: id };
   };
   async function deliver(tab, state, allowInject = false) {
     if (!state.configured || !Number.isInteger(tab.id) || tab.windowId !== state.windowId) return null;
@@ -39,7 +40,15 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
     return enqueue(tab.windowId, async () => {
       const previous = await read(tab.windowId);
       if (message.type === 'ezr:window-toolbar:get') return { ok: true, ...previous };
-      const state = { enabled: message.enabled === true, revision: previous.revision + 1 };
+      if (message.type === 'ezr:window-toolbar:translation') {
+        if (typeof message.visible !== 'boolean') throw new Error('工具栏显示状态无效。');
+        // Remember the preference for new pages without changing other open pages or enabling the window.
+        const state = { translationVisible: message.visible, revision: previous.revision };
+        if (previous.configured) state.enabled = previous.enabled;
+        await api.storage.session.set({ [keyOf(tab.windowId)]: state });
+        return { ok: true, ...previous, translationVisible: state.translationVisible };
+      }
+      const state = { enabled: message.enabled === true, translationVisible: previous.translationVisible, revision: previous.revision + 1 };
       await api.storage.session.set({ [keyOf(tab.windowId)]: state });
       const value = { configured: true, windowId: tab.windowId, ...state };
       const tabs = await api.tabs.query({ windowId: tab.windowId });
@@ -59,7 +68,7 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
   };
   const quietly = job => { void job.catch(() => {}); };
   api.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['ezr:window-toolbar:get', 'ezr:window-toolbar:set'].includes(message?.type)) return;
+    if (!['ezr:window-toolbar:get', 'ezr:window-toolbar:set', 'ezr:window-toolbar:translation'].includes(message?.type)) return;
     handle(message, sender).then(respond).catch(error => respond({ ok: false, message: error.message }));
     return true;
   });

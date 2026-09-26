@@ -221,3 +221,10 @@ test('storageKeyFor keys are single-line and non-empty for every input', () => {
     }
   }
 });
+test('global tool font scale has a stable default and bounded numeric values', () => {
+  assert.equal(normalizeSettings({}).toolFontScale,1);
+  assert.equal(normalizeSettings({toolFontScale:.5}).toolFontScale,.75);
+  assert.equal(normalizeSettings({toolFontScale:3}).toolFontScale,1.75);
+  assert.equal(normalizeSettings({toolFontScale:NaN}).toolFontScale,1);
+  assert.equal(normalizeSettings({toolFontScale:1.25}).toolFontScale,1.25);
+});

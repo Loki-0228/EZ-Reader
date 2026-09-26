@@ -78,6 +78,7 @@ test('DEFAULT_SETTINGS is frozen and exactly as specified', () => {
     showOutline: false,
     toolbarDock: 'top',
     translationToolbarDock: 'top',
+    toolFontScale: 1,
     rememberPerSite: true,
     restorePosition: true,
   });
@@ -88,7 +89,7 @@ test('DEFAULT_SETTINGS is frozen and exactly as specified', () => {
 test('every numeric default sits inside SETTING_LIMITS', () => {
   assert.ok(Object.isFrozen(SETTING_LIMITS));
   assert.deepEqual(Object.keys(SETTING_LIMITS).sort(), [
-    'bodyFontSize', 'gapExtraPx', 'gapFactor', 'lineHeight', 'measure', 'zoom',
+    'bodyFontSize', 'gapExtraPx', 'gapFactor', 'lineHeight', 'measure', 'toolFontScale', 'zoom',
   ]);
   for (const [key, range] of Object.entries(SETTING_LIMITS)) {
     assert.ok(Object.isFrozen(range));

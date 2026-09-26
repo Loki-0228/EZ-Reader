@@ -24,6 +24,7 @@ export const CSS_VARS = Object.freeze([
   '--ezr-gap',
   '--ezr-measure',
   '--ezr-scale',
+  '--ezr-tool-size',
   '--ezr-fg',
   '--ezr-bg',
   '--ezr-muted',
@@ -68,6 +69,7 @@ export function readerCss() {
   --ezr-gap: 43px;
   --ezr-measure: 44rem;
   --ezr-scale: 1;
+  --ezr-tool-size: 13px;
   --ezr-fg: #1a1a1a;
   --ezr-bg: #ffffff;
   --ezr-muted: #6b7280;
@@ -240,11 +242,11 @@ export function readerCss() {
 .ezr-toolbar {
   padding: 10px 16px;
   gap: 8px;
-  font: 13px/1.4 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font: var(--ezr-tool-size, 13px)/1.4 'Segoe UI', 'Microsoft YaHei', sans-serif;
 }
 .ezr-title-chip { flex: 1 1 180px; max-width: 30ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ezr-toolbar button, .ezr-toolbar select {
-  min-height: 30px; padding: 4px 9px; border: 1px solid var(--ezr-border);
+  min-height: 2.308em; padding: .308em .692em; border: 1px solid var(--ezr-border);
   border-radius: 7px; background: var(--ezr-bg); color: var(--ezr-fg); font: inherit; cursor: pointer;
 }
 .ezr-toolbar button:hover { background: color-mix(in srgb, var(--ezr-fg) 6%, var(--ezr-bg)); }
@@ -260,17 +262,19 @@ export function readerCss() {
 .ezr-toolbar :focus-visible { outline: 2px solid var(--ezr-accent); outline-offset: 2px; }
 
 .ezr-toolbar[hidden] { display:none!important; }
-.ezr-toolbar { display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0, 1fr) auto; align-items:start; gap:12px; padding:10px 16px; }
+.ezr-toolbar { display:grid; grid-template-columns:var(--ezr-toolbar-title-width, clamp(120px, 15vw, 210px)) minmax(0, 1fr) auto; align-items:start; gap:.923em; padding:.769em 1.231em; }
 .ezr-title-chip { max-width:none; min-width:0; align-self:center; }
 .ezr-toolbar .ezr-reading-pdf .ezr-btn-original {border-right:0;border-radius:7px;}
-.ezr-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.ezr-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.615em; min-width:0; }
+.ezr-toolbar .ezr-btn-settings { margin-inline-start:auto; min-width:5.6em; white-space:nowrap; }
 .ezr-toolbar .ezr-btn-translation[aria-expanded="true"], .ezr-full-bar .ezr-full-reader-tools[aria-expanded="true"] { color:var(--ezr-accent); border-color:var(--ezr-accent); background:color-mix(in srgb,var(--ezr-accent) 7%,var(--ezr-bg)); }
 /* The dock toggle and the close icon are frameless icon buttons; only their hover tint draws anything. */
 .ezr-toolbar .ezr-toolbar-close, .ezr-full-bar .ezr-toolbar-close,
-.ezr-toolbar .ezr-toolbar-dock, .ezr-full-bar .ezr-toolbar-dock { display:grid; place-items:center; width:32px; min-width:32px; height:30px; padding:0; color:var(--ezr-muted); border:0; background:transparent; border-radius:6px; cursor:pointer; }
+.ezr-toolbar .ezr-toolbar-dock, .ezr-full-bar .ezr-toolbar-dock { display:grid; place-items:center; width:2.462em; min-width:2.462em; height:2.308em; padding:0; color:var(--ezr-muted); border:0; background:transparent; border-radius:6px; cursor:pointer; }
 .ezr-toolbar .ezr-toolbar-close:hover, .ezr-full-bar .ezr-toolbar-close:hover,
 .ezr-toolbar .ezr-toolbar-dock:hover, .ezr-full-bar .ezr-toolbar-dock:hover { color:var(--ezr-fg); background:color-mix(in srgb,var(--ezr-fg) 7%,var(--ezr-bg)); }
-.ezr-toolbar-end { display: inline-flex; align-items: center; justify-self: end; gap: 8px; white-space: nowrap; }
+.ezr-toolbar-end { display: inline-flex; align-items: center; justify-self: end; gap: .615em; white-space: nowrap; }
+.ezr-toolbar-end svg { width:1.385em; height:1.385em; }
 .ezr-toolbar-dock svg { display: block; }
 .ezr-toolbar-actions > * { max-width: 100%; }
 .ezr-font-field { min-width: 0; }
@@ -546,6 +550,7 @@ export function cssVarsFor(settings) {
     '--ezr-gap': `${gapPx}px`,
     '--ezr-measure': `${/** @type {number} */ (s.measure)}rem`,
     '--ezr-scale': String(scale),
+    '--ezr-tool-size': `${13 * s.toolFontScale}px`,
     '--ezr-fg': palette.fg,
     '--ezr-bg': palette.bg,
     '--ezr-muted': palette.muted,

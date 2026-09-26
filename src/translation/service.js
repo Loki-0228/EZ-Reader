@@ -1,5 +1,5 @@
 import { MAX_CONTEXT, MAX_SELECTION, normalizeTranslation, languageName, translationContextKey } from './config.js';
-import { ANALYZE_PROMPT, TRANSLATE_PROMPT, WORD_CARD_PROMPT, VOCABULARY_PROMPT, normalizeSummary } from './prompts.js';
+import { ANALYZE_PROMPT, TRANSLATE_PROMPT, WORD_CARD_PROMPT, VOCABULARY_PROMPT, FULL_CARDS_PROMPT, normalizeSummary } from './prompts.js';
 import { isWordSelection, normalizeAiKnowledge } from './word-card.js';
 import { dictionaryEntry, wiktionaryEntries } from './dictionary.js';
 import { normalizeVocabulary } from './vocabulary.js';
@@ -243,6 +243,7 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
     const { entry } = await getSession(fullInput, settings, apiKey);
     entry.fullCache ||= new Map();
     entry.fullQueue ||= Promise.resolve();
+    if (provider === 'deepseek' && settings.bubbleCards) return fullWithCards(input, settings, apiKey, entry);
     const keyOf = text => JSON.stringify([provider, text]);
     const missing = [...new Set(texts)].filter(text => !entry.fullCache.has(keyOf(text)));
     for (const text of missing) {
@@ -265,6 +266,75 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
     // Bound retained worker data. The document keeps its own already-rendered results.
     while (entry.fullCache.size > 3000) entry.fullCache.delete(entry.fullCache.keys().next().value);
     return { results, cached: missing.length === 0, ...(failure ? { error: failure.reason.message || '部分内容翻译失败，请重试。' } : {}) };
+  }
+  async function fullWithCards(input, settings, apiKey, entry) {
+    const config = normalizeTranslation(settings), texts = [...new Set(input.texts)];
+    const keyOf = text => JSON.stringify(['bubbles', config.level, config.explanations, text]);
+    const plainKey = text => JSON.stringify(['deepseek', text]);
+    const missing = texts.filter(text => !entry.fullCache.has(keyOf(text)));
+    if (missing.length) {
+      // Capture only earlier translations. Looking up the cache inside the queued job can
+      // find a later plain-text job that is itself waiting for this batch to finish.
+      const previousTranslations = missing.map(text => entry.fullCache.get(plainKey(text)));
+      const batch = entry.fullQueue.then(async () => {
+        ensure(entry);
+        const segments = await Promise.all(missing.map(async (text, id) => ({ id, text,
+          existingTranslation: (await previousTranslations[id])?.text || '' })));
+        const excluded = Array.isArray(input.excludeTerms) ? input.excludeTerms.filter(term => typeof term === 'string').slice(0, 80).map(term => term.slice(0, 64)) : [];
+        // The translation and its small glossary share one request; no per-word call or separate summary.
+        const raw = await deepseek([
+          { role:'system', content:withStyle(FULL_CARDS_PROMPT, config.stylePrompt) },
+          { role:'user', content:JSON.stringify({ title:String(input.view.title || '').slice(0, 300),
+            context:input.view.context.slice(0, 1800), source:config.source, target:languageName(config.target),
+            learnerLevel:config.level, includeExplanation:config.explanations, excludeTerms:excluded, segments }) },
+        ], config, apiKey, entry, true, 6000);
+        let data;
+        try { data = JSON.parse(raw); } catch { throw new Error('全文译文与词卡格式无效，请重试失败项。'); }
+        if (!Array.isArray(data?.segments)) throw new Error('全文译文与词卡格式无效，请重试失败项。');
+        const seen = new Set();
+        return segments.map(segment => {
+          const matches = data.segments.filter(item => item?.id === segment.id);
+          const item = matches.length === 1 ? matches[0] : null;
+          if (!item || typeof item.text !== 'string' || !item.text.trim() || item.text.length > 16000) return null;
+          const text = segment.existingTranslation || item.text.trim();
+          let words = [];
+          if (Array.isArray(item.words)) {
+            words = normalizeVocabulary(JSON.stringify({ words:item.words }), segment.text, {
+              target:config.target, level:config.level, explanations:config.explanations,
+            }).slice(0, 3).filter(word => {
+              const key = word.term.toLowerCase();
+              if (seen.size >= 6 || seen.has(key) || excluded.some(term => term.toLowerCase() === key)) return false;
+              seen.add(key); return true;
+            }).map(word => {
+              const candidate = item.words.find(value => typeof value?.term === 'string' && value.term.trim().toLowerCase() === word.term.toLowerCase())?.translatedTerm;
+              return { ...word, translatedTerm:typeof candidate === 'string' && candidate.trim().length <= 80 && text.includes(candidate.trim()) ? candidate.trim() : '' };
+            });
+          }
+          return { source:segment.text, text, provider:'deepseek', target:config.target,
+            sourceLanguage:input.view.language || config.source, words, wordsLevel:config.level, wordsExplanations:config.explanations };
+        });
+      });
+      missing.forEach((text, index) => {
+        const job = batch.then(results => {
+          if (!results[index]) throw new Error('部分片段未返回完整译文，请重试失败项。');
+          entry.fullCache.set(plainKey(text), Promise.resolve(results[index]));
+          return results[index];
+        });
+        entry.fullCache.set(keyOf(text), job);
+        // Pure translation requests made while cards are in flight share the same result.
+        if (!entry.fullCache.has(plainKey(text))) entry.fullCache.set(plainKey(text), job);
+        void job.catch(() => {
+          for (const key of [keyOf(text), plainKey(text)]) if (entry.fullCache.get(key) === job) entry.fullCache.delete(key);
+        });
+      });
+      entry.fullQueue = batch.catch(() => {});
+    }
+    const settled = await Promise.allSettled(texts.map(text => entry.fullCache.get(keyOf(text))));
+    ensure(entry);
+    while (entry.fullCache.size > 3000) entry.fullCache.delete(entry.fullCache.keys().next().value);
+    const failed = settled.find(item => item.status === 'rejected');
+    return { results:settled.filter(item => item.status === 'fulfilled').map(item => item.value), cached:!missing.length,
+      ...(failed ? { error:failed.reason.message } : {}) };
   }
   async function learn(input, rawConfig, apiKey = '') {
     if (!normalizeTranslation(rawConfig).explanations) return { available: false, note: '词语讲解已关闭。' };

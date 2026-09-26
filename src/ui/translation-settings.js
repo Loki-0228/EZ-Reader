@@ -33,6 +33,7 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
   add('source', '原文语言', '', [['auto', '自动识别'], ...LANGUAGES]);
   add('target', '全文与划词目标语言', '也可在翻译工具栏中切换', LANGUAGES);
   add('model', 'DeepSeek 模型', '', MODELS.map(model => [model, model]));
+  add('bubbleCards', '全文翻译泡泡词卡', '关闭划词翻译后仍可使用；绿点为缓存词卡，黄点为生词本词汇');
   const learning = make('div', 'ezr-settings-learning');
   learning.appendChild(make('h4', 'ezr-settings-subtitle', '词语学习'));
   add('explanations', '生成词语讲解', '免费翻译查词典，AI 根据语境讲解', null, learning);
@@ -50,13 +51,13 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
     if (destroyed) return;
     for (const [key, input] of controls) {
       if (input.type === 'checkbox') input.checked = prefs[key]; else input.value = prefs[key];
-      input.disabled = !ready || busy || (selectionKeys.has(key) && !prefs.enabled)
-        || (['explanations','wordCards','autoSave','level'].includes(key) && original)
+      input.disabled = !ready || busy || (selectionKeys.has(key) && !prefs.enabled && !(prefs.bubbleCards && ['level','explanations'].includes(key)))
+        || (['explanations','wordCards','autoSave','level'].includes(key) && original && !(prefs.bubbleCards && ['level','explanations'].includes(key)))
         || (key === 'autoSave' && !prefs.wordCards)
-        || (key === 'level' && (prefs.provider !== 'deepseek' || (!prefs.wordCards && !prefs.explanations)))
+        || (key === 'level' && (prefs.provider !== 'deepseek' || (!prefs.wordCards && !prefs.explanations && !prefs.bubbleCards)))
         || (key === 'model' && prefs.provider !== 'deepseek');
     }
-    learning.hidden = original;
+    learning.hidden = original && !prefs.bubbleCards;
   }
   async function load() {
     const token = ++revision;

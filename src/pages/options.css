@@ -403,3 +403,5 @@ body {
 .wordbook-help p { line-height: 1.8; }
 #translation-save { background: var(--ui-accent); color: var(--ui-accent-fg); border-color: var(--ui-accent); }
 @media (max-width: 520px) { .translation-grid { grid-template-columns: 1fr; } }
+#tool-font-preview { display:flex; align-items:center; flex-wrap:wrap; gap:.615em; padding:.769em 1.231em; font:13px/1.4 'Segoe UI','Microsoft YaHei',sans-serif; }
+#tool-font-preview button { min-height:2.308em; padding:.308em .692em; font:inherit; color:inherit; background:transparent; border:1px solid currentColor; border-radius:7px; opacity:1; }

@@ -27,6 +27,8 @@
           <p class="note">只调用所选服务，不会同时请求另一种翻译 API。默认关闭；开启后，选中文字会自动发送。</p>
           <label class="translation-toggle"><input type="checkbox" id="translation-explanations" /> 生成词语讲解</label>
           <label class="translation-toggle"><input type="checkbox" id="translation-word-cards" /> 生成生词卡（可导出 Anki）</label>
+          <label class="translation-toggle"><input type="checkbox" id="translation-bubble-cards" /> 全文翻译泡泡词卡（独立于划词翻译）</label>
+          <p class="note">绿点是本篇缓存词卡，黄点是生词本词汇。点击圆点打开词卡；最小化保留圆点，关闭后本篇不再显示。泡泡词卡仅在手动加入时保存。</p>
           <label class="translation-toggle"><input type="checkbox" id="translation-auto-save" /> 将生成的卡片自动加入生词本</label>
           <p class="note">讲解、卡片、保存分别控制。可以只看讲解，也可以只生成词语与译文卡片；生成卡片不会自动保存，除非勾选上面的自动加入。</p>
           <label class="translation-field">英语水平（AI 生词难度）<select class="control" id="translation-level"></select></label>
@@ -183,6 +185,13 @@
           <output class="row__value" id="out-zoom" for="set-zoom">100%</output>
         </div>
 
+        <div class="row">
+          <label class="row__label" for="set-tool-font-scale">工具字体缩放</label>
+          <div class="row__control"><input id="set-tool-font-scale" class="control range" type="range" min="0.75" max="1.75" step="0.05" value="1" data-key="toolFontScale"></div>
+          <output class="row__value" id="out-tool-font-scale" for="set-tool-font-scale">100%</output>
+        </div>
+        <p class="note">阅读、翻译和 PDF 编辑工具栏共用此设置；字号缩小时，按钮和工具栏高度随之缩小。</p>
+        <div id="tool-font-preview" aria-label="工具字体预览"><span>工具栏预览</span><button type="button" disabled>全文翻译</button><button type="button" disabled>批量编辑</button></div>
         <div class="row">
           <label class="row__label" for="set-theme">配色主题</label>
           <div class="row__control">

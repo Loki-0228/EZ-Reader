@@ -1,8 +1,8 @@
-/** Pointer/keyboard selection for the positioned PDF translation layer. */
+/** Pointer/keyboard selection for original PDF box geometry, including untranslated formulas. */
 export function createPdfEditor({ container, onChange = () => {} }) {
   const doc = container.ownerDocument, selected = new Set(), abort = new AbortController();
   let available = false, active = false, drag = null, marquee = null;
-  const nodes = () => [...container.querySelectorAll('.ezr-pdf-text')];
+  const nodes = () => [...container.querySelectorAll('.ezr-pdf-edit-box')];
   const state = () => ({ active, available, selected:[...selected] });
   function cancelDrag() {
     const pointer = drag?.pointer; drag = null; marquee?.remove(); marquee = null;
@@ -11,14 +11,15 @@ export function createPdfEditor({ container, onChange = () => {} }) {
   function refresh() {
     for (const node of nodes()) {
       const chosen = active && selected.has(node.dataset.box);
-      node.classList.toggle('ezr-pdf-text-selected', chosen);
+      node.classList.toggle('ezr-pdf-edit-selected', chosen);
       if (active) {
         node.tabIndex = 0; node.setAttribute('role','button'); node.setAttribute('aria-pressed',String(chosen));
-        node.setAttribute('aria-label','选择译文文本框：' + node.dataset.fullText.slice(0,80));
+        node.setAttribute('aria-label',(node.dataset.original === 'true' ? '已标记原文：' : '选择文本框：') + node.dataset.fullText.slice(0,80));
       } else {
         for (const name of ['tabindex','role','aria-pressed','aria-label']) node.removeAttribute(name);
       }
     }
+    for (const node of container.querySelectorAll('.ezr-pdf-text')) node.classList.toggle('ezr-pdf-text-selected', active && selected.has(node.dataset.box));
     onChange(state());
   }
   function setActive(value) {
@@ -47,7 +48,7 @@ export function createPdfEditor({ container, onChange = () => {} }) {
     if (!active || event.button !== 0) return;
     event.preventDefault(); event.stopImmediatePropagation(); doc.getSelection()?.removeAllRanges(); cancelDrag();
     drag = { x:event.clientX, y:event.clientY, pointer:event.pointerId, moved:false,
-      id:event.target.closest('.ezr-pdf-text')?.dataset.box, additive:event.ctrlKey || event.metaKey || event.shiftKey };
+      id:event.target.closest('.ezr-pdf-edit-box')?.dataset.box, additive:event.ctrlKey || event.metaKey || event.shiftKey };
     container.setPointerCapture(event.pointerId);
   }
   function move(event) {
@@ -69,7 +70,7 @@ export function createPdfEditor({ container, onChange = () => {} }) {
   function keydown(event) {
     if (!active) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); setActive(false); return; }
-    const node = event.target.closest?.('.ezr-pdf-text');
+    const node = event.target.closest?.('.ezr-pdf-edit-box');
     if (node && container.contains(node) && ['Enter',' '].includes(event.key)) {
       event.preventDefault(); event.stopImmediatePropagation();
       choose([node.dataset.box],event.ctrlKey || event.metaKey || event.shiftKey,true);
