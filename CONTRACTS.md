@@ -354,7 +354,7 @@ export function cssVarsFor(settings)
 - 扩展弹窗的主按钮是当前窗口的网页工具栏开关，文字跟随当前页主栏的实际显示状态：主栏正在显示时为“关闭工具栏”，点击关闭窗口内全部工具栏；主栏被 × 藏掉或尚未显示时为“网页工具栏”，点击产生新 revision 重新显示主栏；窗口未启用时同为“网页工具栏”（原生 PDF 页显示“打开 PDF 工具栏”并打开 PDF 阅读窗口）。弹窗经 `ezr:status` 新增的 `toolbarVisible` 字段读取主栏真实可见性（会话访问器 `mainToolbarVisible`），内容脚本不可达时按窗口开关兜底显示。页面受浏览器限制无法注入时按钮置灰但仍可关闭工具栏，开关状态即使当前页无法显示工具栏也照常保存。弹窗另提供“打开 PDF”入口。页面上默认挂载原网页工具栏，未点击简洁阅读前不提取正文，不自动请求翻译。空正文页面同样能使用工具栏、选区和网页翻译。
 - 选区仅在原网页视图可用；缩放、字体和大纲仅在简洁阅读中可用。阅读切换与选区是一个带 role=group 的左右两段控件，窄屏不拆开换行。不可用控件使用原生 disabled 并提供 title 原因；按钮、快捷键和选区消息入口都必须遵循视图限制。大写、设置、翻译与关闭两种视图均可用。
 - 设置抽屉在原网页显示通用翻译偏好、配色、大写和站点显示偏好，隐藏并禁用排版与词语学习控件。`translation-settings.js` 使用独立翻译配置协议，不把翻译偏好混入站点排版设置，不接触密钥；保存期间防止重入并同步 storage 变化，销毁后移除监听。原网页的界面重置仅恢复配色、大写和显示记忆偏好，不清除翻译设置与阅读排版。
-- `original-capitalization.js` 仅在原网页且 capitalizeFirst 为 true 时调整原元素 text-transform，保留节点/文字/事件目标。保护代码、编辑区、表单等子树不继承大写；新内容批量扫描，纯 characterData 翻译写入不触发重新扫描。切换视图、选区或关闭时恢复本扩展的样式，不覆盖网页后续更新；划词直接使用浏览器返回的选中文字，Range 只用于定位，不重建文本。
+- `original-capitalization.js` 仅在原网页且 capitalizeFirst 为 true 时调整原元素 text-transform，保留节点/文字/事件目标。保护代码、编辑区、表单等子树不继承大写；新内容批量扫描，纯 characterData 翻译写入不触发重新扫描。切换视图、选区或关闭时恢复本扩展的样式，不覆盖网页后续更新；原网页划词读取 Range 自身的 DOM 文本，网页 CSS text-transform 不得改变送翻译与缓存的词形，阅读视图则沿用浏览器返回的选中文字以保留段落分隔。Range 同时用于定位，不按视觉样式重建文本。
 - `background/window-toolbar.js` 在可信后台以 `chrome.storage.session['ezr:toolbar:window:'+windowId]` 保存 enabled/revision。窗口内更新串行化，广播限定该窗口，可信 sender 决定窗口，不接受网页自报 windowId 或 tabId 越权。主框架内容脚本启动时查询；标签页激活、导航和跨窗口移动时同步；窗口关闭删除状态。保持 session 默认的可信上下文访问级别。
 - 内容脚本按窗口标识与 revision 忽略过期状态，异步挂载用 lifecycle 防止关闭后被迟到初始化重新打开。换页后重建原网页工具栏；已有同页阅读视图在重复打开时保持不变。主工具栏的 × 仅隐藏当前页主栏，保留阅读会话、翻译工具和框架划词。相同 revision 的窗口同步不重新显示主栏；用户从扩展面板显式打开产生新 revision 后才恢复主栏。页面受浏览器限制无法注入时显示可操作提示。
 - Esc 键优先退出划词、设置与选区状态；在简洁阅读模式下按 Esc 退回原网页，在原网页模式下则保留工具栏。主栏和翻译栏的关闭图标只控制各自可见性，不结束窗口内的翻译支持。调试接口 open/close 用于创建与清理局部非持久会话，不改变窗口状态。
@@ -362,7 +362,7 @@ export function cssVarsFor(settings)
 
 ## 文档阅读与选区读取
 
-- src/dom/user-selection.js 读取真实 Selection.toString() 或文本控件的 selectionStart/selectionEnd；不再要求选中文字经正文提取器识别，不读取密码框或剪贴板。range 可为空，UI 必须兼容文本控件。
+- src/dom/user-selection.js 默认读取真实 Selection.toString()，传入 `domText` 时改读 Range 自身的 DOM 文本（网页 CSS text-transform 会改写 Selection.toString() 返回的词形）；文本控件读取 selectionStart/selectionEnd。不再要求选中文字经正文提取器识别，不读取密码框或剪贴板。range 可为空，UI 必须兼容文本控件。
 - src/dom/document-sources.js 只发现明确的 PDF 及 Canvas 文件入口；所有框架分别发现，后台按 URL 去重。
 - 非主框架在当前窗口工具栏启用后创建独立的划词浮层。文档身份、请求及缓存仍由 Chrome sender 的 tabId/frameId/documentId 隔离。
 - 原生查看器使用 contextMenus.selectionText 获取用户选中文字；入口数据仅临时保存在 storage.session，30 分钟过期，最多保留 16 项。
@@ -373,7 +373,7 @@ export function cssVarsFor(settings)
 ## 统一翻译工具栏
 
 - 主栏「翻译工具」与翻译栏「阅读工具」常驻在各自停靠按钮左侧，点击仅显示另一栏，已显示时保持原状，`aria-expanded` 反映对方显示状态。输入文字入口和划词 enabled 开关在翻译栏展示。
-- 全文翻译与显示原文为同一按钮的互斥状态，停止或切回原文后保留已完成缓存。关闭划词不清除全文缓存，不影响输入/全文翻译。选中译文也可显示浮窗，不读取密码输入。
+- 全文翻译与显示原文为同一按钮的互斥状态，停止或切回原文后保留已完成缓存。关闭划词不清除全文缓存，不影响输入/全文翻译。选中译文（含跨段选区与原文译文混合选区）不弹窗、不发请求，也不读取密码输入。
 - 两栏共享标题列宽、按钮起点、30px 控件高度及最右侧灰色 SVG 关闭按钮。各自使用独立 toolbarHost 停靠；窄屏时右侧动作组保持可见，主体控件换行。PDF 视口分别观察上下停靠容器的实际高度并预留空间。
 - PDF 入口由 popup 直接调用共享 openPdfForTab/createPdfEntry 创建视图，文档页直接读取受信任 session 数据，不把缺失后台响应作为打开页面的前置条件。原生 PDF 通过该扩展视图提供浮窗；网页 PDF 控件由帧内内容脚本读取选区。
 - PDF 页仅允许 __ezr.setPdfDocument 注入受限文本数据构建阅读 IR；全文翻译通过受信任文档页的 __ezrPdfTranslation 适配器替换原页文字，不自动切换阅读模式。PPT/PPTX 源文件解析不在支持范围内，但支持它们导出的带文字层 PDF。
