@@ -296,11 +296,15 @@ export class CdpPage {
    * worlds report the same origin).
    *
    * @param {string} probeExpression expression that is truthy only in the target world
-   * @param {{ timeoutMs?: number, intervalMs?: number }} [options]
+   * @param {{ timeoutMs?: number, intervalMs?: number, topFrame?: boolean }} [options]
+   *   `topFrame` (default true) keeps probing past a matching subframe context until the
+   *   top frame's world matches as well: a page with an embedded frame registers the same
+   *   marker in every frame, and the suites drive the top document.
    * @returns {Promise<number|null>} the context id, or null when not found
    */
-  async findContext(probeExpression, { timeoutMs = 25000, intervalMs = 200 } = {}) {
+  async findContext(probeExpression, { timeoutMs = 25000, intervalMs = 200, topFrame = true } = {}) {
     const deadline = Date.now() + timeoutMs;
+    let subframe = null;
     for (;;) {
       for (const context of this.executionContexts()) {
         try {
@@ -309,12 +313,20 @@ export class CdpPage {
             { expression: probeExpression, contextId: context.id, returnByValue: true },
             this.sessionId,
           );
-          if (!result.exceptionDetails && result.result && result.result.value) return context.id;
+          if (result.exceptionDetails || !result.result || !result.result.value) continue;
+          if (!topFrame) return context.id;
+          const outer = await this.session.send(
+            'Runtime.evaluate',
+            { expression: 'window.top === window', contextId: context.id, returnByValue: true },
+            this.sessionId,
+          );
+          if (outer.result && outer.result.value === true) return context.id;
+          if (subframe === null) subframe = context.id;
         } catch {
           /* a context may disappear mid-probe; try the next one */
         }
       }
-      if (Date.now() >= deadline) return null;
+      if (Date.now() >= deadline) return subframe;
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
   }
