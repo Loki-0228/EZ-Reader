@@ -371,10 +371,11 @@ function launch(browser) {
     'about:blank',
   ].filter(Boolean);
 
-  const child = spawn(browser, flags, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  // Piped stdio makes Node open named pipes for the child, which confined sandboxes deny
+  // outright (spawn EPERM). Inheriting stdio keeps the browser's own output visible on this
+  // console while capturing nothing, so the suite also runs inside those sandboxes.
+  const child = spawn(browser, flags, { stdio: 'inherit', windowsHide: true });
   const log = [];
-  child.stdout.on('data', (d) => log.push(String(d)));
-  child.stderr.on('data', (d) => log.push(String(d)));
   child.on('error', (error) => log.push(`spawn error: ${error.message}`));
   return { child, log };
 }
@@ -583,7 +584,8 @@ async function interactionChecks(page, iso) {
   state = await status();
   check('原文模式取消选区后仍显示原文', state.active && state.previewing && !state.picking);
   await click('.ezr-btn-close', true);
-  check('从原文模式关闭后逐字节还原页面', initialHtml === await iso('document.documentElement.outerHTML'));
+  state = await status();
+  check('主栏关闭图标只隐藏工具栏，保留原文模式的阅读会话', state.active && await iso(`(function(){var h=document.getElementById('ezr-root');var b=h&&h.shadowRoot.querySelector('.ezr-toolbar');return !!b&&b.hidden;})()`));
 
   await iso(`window.__ezrSend({ type: 'ezr:pick' })`);
   await escape();
@@ -1109,7 +1111,7 @@ async function main() {
   } catch (error) {
     console.error(`\n[test] 执行失败: ${error.message}`);
     console.error(String((error && error.stack) || '').split('\n').slice(0, 12).join('\n'));
-    if (log.length) console.error('[test] 浏览器输出（末尾）:\n' + log.join('').split('\n').slice(-15).join('\n'));
+    if (log.length) console.error('[test] 浏览器诊断:\n' + log.join('\n'));
     process.exitCode = 1;
   } finally {
     if (session) session.close();

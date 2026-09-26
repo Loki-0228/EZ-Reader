@@ -56,8 +56,10 @@ export async function textTranslationChecks(page, iso, check, artifacts) {
 
   try {
     check('输入文本翻译浮窗默认隐藏', await sh("return sh.querySelector('.ezr-text-translation').hidden === true;"));
-    await click('.ezr-btn-text-translation');
-    check('工具栏“输入文本翻译”按钮打开浮窗', await sh("const p=sh.querySelector('.ezr-text-translation');return p.hidden===false && p.getBoundingClientRect().width>200;"));
+    await sh("sh.querySelector('.ezr-btn-translation').click();");
+    await pause(120);
+    await click('.ezr-full-input');
+    check('翻译栏“输入文字”按钮打开浮窗', await sh("const p=sh.querySelector('.ezr-text-translation');return p.hidden===false && p.getBoundingClientRect().width>200;"));
     check('浮窗打开在视口内，不溢出窗口', await sh("const r=sh.querySelector('.ezr-text-translation').getBoundingClientRect();return r.left>=0 && r.top>=0 && r.right<=innerWidth+1 && r.bottom<=innerHeight+1;"));
     check('空输入时翻译按钮不可用', await sh("return sh.querySelector('.ezr-text-run').disabled === true;"));
 

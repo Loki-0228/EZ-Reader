@@ -310,11 +310,11 @@ export async function translationChecks(page, iso, check, artifacts) {
     await options.screenshot({ path: path.join(artifacts, 'wordbook-settings.png') });
     await options.evaluate('window.scrollTo(0,0)');
     await options.screenshot({ path: path.join(artifacts, 'translation-settings.png') });
-    await options.evaluate(`document.getElementById('translation-enabled').checked=false; document.getElementById('translation-save').click();`);
+    await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:{enabled:false}})`);
     await pause(200);
     await choose(0, 35);
     check('关闭划词翻译后不再弹出浮层', await evaluate("return sh.querySelector('.ezr-translation').hidden;"));
-    await options.evaluate(`document.getElementById('translation-enabled').checked=true; document.getElementById('translation-save').click();`);
+    await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:{enabled:true}})`);
     await pause(200);
     await options.evaluate(`document.getElementById('translation-remove-key').click();`);
     await pause(200);

@@ -37,7 +37,8 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
   const analyses = () => calls.filter(call => call.messages[0]?.content.includes('语境分析器'));
   const reader = code => iso(`(()=>{const sh=document.getElementById('ezr-root').shadowRoot;${code}})()`);
   const original = reader, control = reader;
-  const complete = () => until(async()=>!(await control("return sh.querySelector('.ezr-full-start').disabled;")), 'Full translation timeout');
+  // 完成信号是「停止按钮隐藏且状态区已有消息」：运行期间停止按钮可见，结束后消息必然落定。
+  const complete = () => until(async()=>await control("return sh.querySelector('.ezr-full-stop').hidden && sh.querySelector('.ezr-full-status').textContent.trim().length>0;"), 'Full translation timeout');
   const select = async (inReader, text, translated = false) => {
     const evaluate = inReader ? reader : original;
     await evaluate(`const p=${inReader ? "sh.querySelector('.ezr-para')" : "document.getElementById('first')"};p.scrollIntoView({block:'center'});
@@ -65,10 +66,10 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     check('免费全文优先翻译页面主体，正文完成后才处理前置导航和侧栏',freeOrder[0]==='Everyday banking' && freeOrder.indexOf('Bank site navigation and account links.')>freeOrder.indexOf('Customers can compare services.') && freeOrder.includes('Other bank services and related pages.'));
     check('原网页大写与全文翻译同时生效，仍按原始文本请求',await page.evaluate("getComputedStyle(document.getElementById('first')).textTransform==='capitalize' && document.getElementById('first').textContent.includes('银行')") && freeOrder.includes('The bank manages financial deposits and provides loans to local businesses.'));
     const capsFreeCount=freeCalls().length;
-    await original("sh.querySelector('.ezr-toggle-caps').click();sh.querySelector('.ezr-toggle-caps').click();sh.querySelector('.ezr-full-start').click();");await complete();
+    await original("sh.querySelector('.ezr-toggle-caps').click();sh.querySelector('.ezr-toggle-caps').click();sh.querySelector('.ezr-full-start').click();sh.querySelector('.ezr-full-start').click();");await complete();
     check('开关原网页大写并继续全文翻译仍复用全部缓存',freeCalls().length===capsFreeCount);
     await original("sh.querySelector('.ezr-toggle-caps').click();");
-    await original("sh.querySelector('.ezr-full-restore').click();");
+    await original("sh.querySelector('.ezr-full-start').click();");
     check('免费全文翻译也能完整还原原网页',await page.evaluate("document.getElementById('article').innerHTML===window.originalArticle"));
     await original("const provider=sh.querySelector('.ezr-full-provider');provider.value='deepseek';provider.dispatchEvent(new Event('change'));");await pause(200);
     await original("sh.querySelector('.ezr-full-start').click();"); await complete();
@@ -76,7 +77,7 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     options = await CdpPage.attach(session,{url:`chrome-extension://${extensionId}/pages/options.html`});
     await until(()=>options.evaluate("!document.getElementById('translation-save').disabled && document.getElementById('translation-key-state').textContent.length>0"),'Translation settings did not load');
     await options.evaluate(`document.getElementById('translation-key').value='sk-ezr-full-test-only';document.getElementById('translation-key').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('translation-provider').value='deepseek';
-      document.getElementById('translation-source').value='auto';document.getElementById('translation-enabled').checked=true;
+      document.getElementById('translation-source').value='auto';
       document.getElementById('translation-preload').checked=false;document.getElementById('translation-auto-save').checked=false;
       document.getElementById('translation-explanations').checked=true;document.getElementById('translation-word-cards').checked=true;document.getElementById('translation-save').click();`);
     await until(()=>options.evaluate("!document.getElementById('translation-save').disabled && document.getElementById('translation-status').textContent.startsWith('翻译设置已保存')"),'Translation settings were not saved');
@@ -101,8 +102,8 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     await original("const p=document.getElementById('first'),range=document.createRange();range.setStart(p.firstChild,0);range.setEnd(document.getElementById('repeat').firstChild,5);const selection=document.getSelection();selection.removeAllRanges();selection.addRange(range);p.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));");await pause(750);
     check('跨段选择译文也不弹窗或触发预加载',calls.length===beforeSelection && await original("return [...sh.querySelectorAll('.ezr-translation')].every(p=>p.hidden);"));
     await iso("chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:{preload:false}})");await pause(150);
-    await original("sh.querySelector('.ezr-full-restore').click();");await select(false,'bank');
-    check('显示原文后可直接划词，无需额外的原网页划词开关',await original("return !sh.querySelector('.ezr-full-selection') && !sh.querySelector('.ezr-original-selection .ezr-translation').hidden && sh.querySelector('.ezr-original-selection .ezr-translation-source').textContent==='bank';"));
+    await original("sh.querySelector('.ezr-full-start').click();");await select(false,'bank');
+    check('显示原文后可直接划词，无需额外的原网页划词开关',await original("return !sh.querySelector('.ezr-original-selection .ezr-translation').hidden && sh.querySelector('.ezr-original-selection .ezr-translation-source').textContent==='bank';"));
     await original("sh.querySelector('.ezr-original-selection .ezr-translate-deepseek').click();");
     await until(()=>original("return sh.querySelector('.ezr-original-selection .ezr-translation-result').textContent==='银行';"),'Original source selection did not translate');
     check('原网页原文划词复用译文且不显示学习卡片',calls.length===beforeSelection && await original("return sh.querySelector('.ezr-original-selection .ezr-word-actions').hidden && !sh.querySelector('.ezr-original-selection .ezr-word-knowledge').textContent;"));
@@ -153,7 +154,7 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     check('阅读器仅译文模式也不响应译文划词',calls.length===beforeTranslatedSelection && await reader("return [...sh.querySelectorAll('.ezr-translation')].every(p=>p.hidden);"));
     await iso(`window.__ezrSend({type:'ezr:update-settings',patch:{bodyFontSize:18}})`);await pause(150);
     check('更改阅读样式后重用译文，不重新翻译',await reader("return sh.querySelector('.ezr-para').textContent.includes('银行');") && fullCalls().length===fullCount);
-    await reader("sh.querySelector('.ezr-full-restore').click();");await iso('window.__ezr.close()');
+    await reader("sh.querySelector('.ezr-full-start').click();");await iso('window.__ezr.close()');
     check('恢复原文逐字节还原文章 DOM',await page.evaluate("document.getElementById('article').innerHTML===window.originalArticle"));
     await iso('window.__ezr.open({})');await pause(200);
     await reader("sh.querySelector('.ezr-btn-translation').click();sh.querySelector('.ezr-full-start').click();");await complete();
@@ -170,18 +171,24 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     await original("const provider=sh.querySelector('.ezr-full-provider');provider.value='free';provider.dispatchEvent(new Event('change'));");await pause(200);
     await original("sh.querySelector('.ezr-full-start').click();");await complete();
     check('切回免费服务复用免费缓存，且不会混用 DeepSeek 缓存',freeCalls().length===freeCount && fullCalls().length===dsCount);
-    await original("sh.querySelector('.ezr-full-restore').click();");
+    await original("sh.querySelector('.ezr-full-start').click();");
     await page.evaluate("const p=document.createElement('p');p.id='quota';p.textContent='New quota test paragraph.';document.getElementById('article').appendChild(p);");
     failNextFree=true;await original("sh.querySelector('.ezr-full-start').click();");await complete();
     check('免费额度错误可见，已完成段落仍然显示译文',await original("return /额度|请求过多/.test(sh.querySelector('.ezr-full-status').textContent);") && await iso("document.getElementById('first').textContent.includes('银行')"));
-    const failedCount=freeCalls().length;await original("sh.querySelector('.ezr-full-start').click();");await complete();
+    // `.ezr-full-start` toggles back to the original text once a translation is applied, so the
+    // failed items are retried through the dedicated control that appears with them.
+    const failedCount=freeCalls().length;
+    await until(()=>original("return !sh.querySelector('.ezr-full-retry').hidden;"),'Retry control missing');
+    await original("sh.querySelector('.ezr-full-retry').click();");
+    await until(()=>Promise.resolve(freeCalls().length>failedCount),'Free retry request missing');
+    await pause(400);
     check('免费重试只请求失败内容，不重新翻译整页',freeCalls().length===failedCount+1);
-    await original("sh.querySelector('.ezr-full-restore').click();");await page.evaluate("document.getElementById('quota').remove();");
+    await original("sh.querySelector('.ezr-full-start').click();");await page.evaluate("document.getElementById('quota').remove();");
     await original("const provider=sh.querySelector('.ezr-full-provider');provider.value='deepseek';provider.dispatchEvent(new Event('change'));");await pause(200);
     await original("sh.querySelector('.ezr-full-start').click();");await complete();
     check('切回 DeepSeek 也复用其已有缓存',fullCalls().length===dsCount);
     await page.evaluate("document.getElementById('repeat').textContent='Site updated this paragraph.';");
-    await original("sh.querySelector('.ezr-full-restore').click();");
+    await original("sh.querySelector('.ezr-full-start').click();");
     check('还原不覆盖网站在翻译后动态更新的文字',await iso("document.getElementById('repeat').textContent==='Site updated this paragraph.'"));
     delay=600;const beforeResume=fullCalls().length;
     await original("sh.querySelector('.ezr-full-start').click();");
@@ -194,7 +201,7 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
     check('网页地址改变后恢复原文并丢弃旧全文语境',await iso("document.getElementById('first').textContent.startsWith('The bank')") && await original("return sh.querySelector('.ezr-full-status').textContent.includes('页面');"));
     await original("sh.querySelector('.ezr-full-start').click();");await complete();
     check('新地址重新分析语境，不沿用上页结果',analyses().length===2);
-    await original("sh.querySelector('.ezr-full-restore').click();");
+    await original("sh.querySelector('.ezr-full-start').click();");
     await iso('window.__ezr.close()');
   } catch (error) {
     console.error('[full-translation] '+error.message);

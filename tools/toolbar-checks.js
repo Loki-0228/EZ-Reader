@@ -15,6 +15,15 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     return code=>target.evaluate(code,{contextId});
   };
   let popup, options, sibling, other, otherWindow, savedTranslation;
+  // 弹窗按钮的状态探测需要一个干净的弹窗目标；复用同一个变量，finally 只关最后一个。
+  const reopenPopup = async () => {
+    await popup?.close().catch(() => {});
+    const created = await session.send('Target.createTarget', { url: `chrome-extension://${extensionId}/pages/popup.html`, background: true });
+    popup = await CdpPage.attach(session, { targetId: created.targetId });
+    await popup.setViewport(320, 215);
+    await until(() => popup.evaluate("!!document.getElementById('primary') && !document.getElementById('primary').disabled"), 'Popup not ready');
+    return popup;
+  };
   try {
     await initialIso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:false})");
     const created=await session.send('Target.createTarget',{url:`chrome-extension://${extensionId}/pages/popup.html`,background:true});
@@ -22,7 +31,7 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await popup.setViewport(320,215);
     await until(()=>popup.evaluate("!!document.getElementById('primary') && !document.getElementById('primary').disabled"),'Popup not ready');
     await popup.setViewport(320,Math.ceil(await popup.evaluate("document.body.getBoundingClientRect().height")));
-    check('扩展弹窗只有一个打开工具栏大按钮，没有快捷设置或其他入口',await popup.evaluate("document.querySelectorAll('button').length===1 && !document.querySelector('input,select') && document.getElementById('primary').textContent.includes('打开工具栏') && document.documentElement.scrollHeight<=innerHeight"));
+    check('扩展弹窗只有主按钮和打开 PDF 两个入口，没有快捷设置',await popup.evaluate("document.querySelectorAll('button').length===2 && !document.querySelector('input,select') && document.getElementById('primary-label').textContent==='网页工具栏' && document.getElementById('documents').textContent==='打开 PDF' && document.documentElement.scrollHeight<=innerHeight"));
     // Background targets can pause CSS transitions; capture settled theme colors.
     await popup.evaluate("document.getElementById('primary').style.transition='none'");
     for(const theme of ['light','dark']) {
@@ -32,14 +41,30 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await popup.evaluate("document.getElementById('primary').style.removeProperty('transition')");
     await popup.evaluate("document.getElementById('primary').click()");
     await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Toolbar did not open');
+    // 弹窗主按钮的三种状态（CONTRACTS §20）：主栏显示时点击关闭，藏掉或未显示时点击重新显示。
+    await reopenPopup();
+    check('主栏显示时弹窗主按钮为「关闭工具栏」',await popup.evaluate("document.getElementById('primary-label').textContent==='关闭工具栏' && document.getElementById('primary').title.includes('关闭')"));
+    await popup.evaluate("document.getElementById('primary').click()");
+    await until(()=>page.evaluate("!document.getElementById('ezr-root')"),'Popup did not close the window toolbars');
+    await reopenPopup();
+    check('窗口工具栏关闭后弹窗回到「网页工具栏」',await popup.evaluate("document.getElementById('primary-label').textContent==='网页工具栏'"));
+    await popup.evaluate("document.getElementById('primary').click()");
+    await until(()=>page.evaluate("!!document.getElementById('ezr-root')"),'Popup did not reopen the toolbar');
+    await sh("sh.querySelector('.ezr-btn-close').click();");
+    await until(()=>sh("return sh.querySelector('.ezr-toolbar').hidden;"),'Close icon did not hide the main toolbar');
+    check('× 只隐藏当前页主栏，阅读会话与页面状态保留',await sh("return sh.querySelector('.ezr-toolbar').hidden && sh.host.hasAttribute('data-ezr-original') && !!document.getElementById('ezr-root')"));
+    await reopenPopup();
+    check('主栏被 × 藏掉后弹窗显示「网页工具栏」并提示重新显示',await popup.evaluate("document.getElementById('primary-label').textContent==='网页工具栏' && document.getElementById('primary').title.includes('重新显示')"));
+    await popup.evaluate("document.getElementById('primary').click()");
+    await until(()=>sh("return !sh.querySelector('.ezr-toolbar').hidden;"),'Popup did not re-show the main toolbar');
     check('打开工具栏默认保留原网页，不自动提取或翻译',await sh("return sh.host.hasAttribute('data-ezr-original') && sh.querySelector('.ezr-article').children.length===0 && sh.querySelector('.ezr-full-bar').hidden;"));
     check('原网页可用选区、大写和通用设置，排版控件置灰并说明原因',await sh("return !sh.querySelector('.ezr-btn-pick').disabled && !sh.querySelector('.ezr-toggle-caps').disabled && [...sh.querySelectorAll('.ezr-zoom button,.ezr-font-select,.ezr-btn-outline')].every(el=>el.disabled&&el.title.includes('简洁阅读')) && !sh.querySelector('.ezr-btn-settings').disabled && !sh.querySelector('.ezr-btn-translation').disabled;"));
     check('简洁阅读和选择区域组成紧邻的左右两段按钮',await sh("const left=sh.querySelector('.ezr-btn-original'),right=sh.querySelector('.ezr-btn-pick'),a=left.getBoundingClientRect(),b=right.getBoundingClientRect();return left.parentElement===right.parentElement && left.parentElement.getAttribute('role')==='group' && Math.abs(a.right-b.left)<1 && a.top===b.top;"));
     check('停靠切换按钮紧挨关闭图标左侧且不带边框，默认停靠窗口顶部',await sh("const btn=sh.querySelector('.ezr-btn-dock'),close=sh.querySelector('.ezr-toolbar .ezr-toolbar-close'),r=btn.getBoundingClientRect(),cs=getComputedStyle(btn);return btn.parentElement.classList.contains('ezr-toolbar-end') && btn.nextElementSibling===close && parseFloat(cs.borderTopWidth)===0 && cs.backgroundColor==='rgba(0, 0, 0, 0)' && sh.host.getAttribute('data-ezr-dock')==='top' && btn.getAttribute('aria-pressed')==='false' && r.top<innerHeight/2;"));
     await sh("sh.querySelector('.ezr-btn-dock').click();");
     await until(()=>sh("return sh.host.getAttribute('data-ezr-dock')==='bottom';"),'Dock toggle did not move the toolbar to the bottom');
-    check('切到下边栏后工具栏贴住窗口底部，原网页顶部不再被遮挡',await sh("const bar=sh.querySelector('.ezr-toolbar'),r=bar.getBoundingClientRect(),host=sh.host.getBoundingClientRect();return Math.abs(r.bottom-innerHeight)<=1 && r.top>innerHeight/2 && host.top>innerHeight/2 && sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='true';"));
-    check('下边栏停靠时上边框出现、下边框消失，阴影翻到上侧',await sh("const bar=sh.querySelector('.ezr-toolbar'),cs=getComputedStyle(bar),host=sh.querySelector('.ezr-toolbar-host');return parseFloat(cs.borderTopWidth)>=2 && parseFloat(cs.borderBottomWidth)===0 && getComputedStyle(host).boxShadow.includes('-4px 14px');"));
+    check('切到下边栏后工具栏贴住窗口底部，原网页顶部不再被遮挡',await sh("const bar=sh.querySelector('.ezr-toolbar'),r=bar.getBoundingClientRect(),top=sh.querySelector('.ezr-toolbar-slot-top');return Math.abs(r.bottom-innerHeight)<=1 && r.top>innerHeight/2 && top.getClientRects().length===0 && sh.querySelector('.ezr-btn-dock').getAttribute('aria-pressed')==='true';"));
+    check('下边栏停靠时上边框出现、下边框消失，阴影翻到上侧',await sh("const bar=sh.querySelector('.ezr-toolbar'),cs=getComputedStyle(bar),slot=sh.querySelector('.ezr-toolbar-slot-bottom');return parseFloat(cs.borderTopWidth)>=2 && parseFloat(cs.borderBottomWidth)===0 && getComputedStyle(slot).boxShadow.includes('-4px 14px');"));
     check('切换按钮的图标与提示随停靠状态更新',await sh("const b=sh.querySelector('.ezr-btn-dock');return b.dataset.target==='top' && b.title.includes('顶部') && b.getAttribute('aria-label')===b.title;"));
     check('停靠状态写入共享默认设置，不写入站点覆盖',await iso("Promise.all([chrome.storage.local.get('ezr:settings:default'),chrome.storage.local.get('ezr:settings:byOrigin')]).then(([d,o])=>{const byOrigin=o['ezr:settings:byOrigin']||{};return d['ezr:settings:default'].toolbarDock==='bottom' && Object.values(byOrigin).every(entry=>!entry||!Object.hasOwn(entry,'toolbarDock'));})"));
     await sh("sh.querySelector('.ezr-btn-dock').click();");
@@ -49,20 +74,22 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     check('点击置灰控件不会更改视图或设置',await sh("return sh.host.hasAttribute('data-ezr-original') && !sh.querySelector('.ezr-settings.is-open');") && (await iso("window.__ezrSend({type:'ezr:status'})")).settings.zoom===1);
     savedTranslation=(await iso("chrome.runtime.sendMessage({type:'ezr:translation:config'})")).config;
     await sh("sh.querySelector('.ezr-btn-settings').click();");
-    await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=enabled]').disabled;"),'Common settings did not load');
+    await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=provider]').disabled;"),'Common settings did not load');
     check('原网页直接打开通用设置，自动翻译控件实际可见可点击',await sh("const panel=sh.querySelector('.ezr-settings'),input=sh.querySelector('[data-ezr-translation-setting=preload]'),r=input.getBoundingClientRect();return sh.host.hasAttribute('data-ezr-original') && panel.classList.contains('is-open') && r.width>0 && sh.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===input;"));
     check('原网页设置隐藏并禁用排版与词语学习，保留配色和 API 入口',await sh("return sh.querySelector('[data-ezr-setting=bodyFontSize]').disabled && !sh.querySelector('[data-ezr-setting=bodyFontSize]').getClientRects().length && !sh.querySelector('[data-ezr-translation-setting=wordCards]').getClientRects().length && !sh.querySelector('input[name=ezr-theme]').disabled && !!sh.querySelector('.ezr-translation-config');"));
     const preference=async(key,value)=>{
       await sh(`const input=sh.querySelector('[data-ezr-translation-setting=${key}]');if(input.disabled)throw Error('Preference disabled: ${key}');if(input.type==='checkbox')input.checked=${JSON.stringify(value)};else input.value=${JSON.stringify(value)};input.dispatchEvent(new Event('change'));`);
-      await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=enabled]').disabled;"),'Preference write did not finish');
+      await until(()=>sh("return sh.querySelector('.ezr-translation-settings-status').textContent==='已保存，所有网页共用。'"),'Preference write did not finish');
     };
     await preference('preload',true);await preference('source','en');await preference('target','ja');
     await preference('provider','deepseek');await preference('model','deepseek-chat');
     const changed=(await iso("chrome.runtime.sendMessage({type:'ezr:translation:config'})")).config;
     check('原网页可保存自动翻译、服务、语言和模型，全文工具同步服务',changed.preload && changed.source==='en' && changed.target==='ja' && changed.provider==='deepseek' && changed.model==='deepseek-chat' && await sh("return sh.querySelector('.ezr-full-provider').value==='deepseek' && sh.host.hasAttribute('data-ezr-original');"));
-    await preference('enabled',false);
-    check('关闭划词后自动翻译禁用，全文翻译的语言与服务仍可调整',await sh("return sh.querySelector('[data-ezr-translation-setting=preload]').disabled && !sh.querySelector('[data-ezr-translation-setting=provider]').disabled && !sh.querySelector('[data-ezr-translation-setting=target]').disabled;"));
-    await preference('enabled',true);
+    await iso("chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:{enabled:false}})");
+    await until(()=>sh("return sh.querySelector('[data-ezr-translation-setting=preload]').disabled;"),'Disabling the selection switch did not reach the panel');
+    check('关闭划词开关后自动翻译禁用，全文翻译的语言与服务仍可调整',await sh("return sh.querySelector('[data-ezr-translation-setting=preload]').disabled && !sh.querySelector('[data-ezr-translation-setting=provider]').disabled && !sh.querySelector('[data-ezr-translation-setting=target]').disabled;"));
+    await iso("chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:{enabled:true}})");
+    await until(()=>sh("return !sh.querySelector('[data-ezr-translation-setting=preload]').disabled;"),'Re-enabling the selection switch did not reach the panel');
     await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:${JSON.stringify(savedTranslation)}})`);
     await until(()=>sh(`return sh.querySelector('[data-ezr-translation-setting=preload]').checked===${savedTranslation.preload} && sh.querySelector('[data-ezr-translation-setting=provider]').value===${JSON.stringify(savedTranslation.provider)};`),'External preference changes did not sync');
     check('外部翻译偏好变更同步回已打开的设置面板',true);
@@ -153,10 +180,12 @@ export async function toolbarChecks(page, initialIso, check, artifacts) {
     await until(()=>sibling.evaluate("!!document.getElementById('ezr-root')"),'Moved tab did not adopt enabled window');
     check('移回已开启的窗口后恢复工具栏',true);
     await sh("sh.querySelector('.ezr-btn-close').click();");
-    await until(()=>sibling.evaluate("!document.getElementById('ezr-root')"),'Closing toolbar did not close sibling');
-    check('关闭工具栏会同时关闭当前窗口其他标签页中的工具栏',!await page.evaluate("!!document.getElementById('ezr-root')"));
+    await until(()=>sh("return sh.querySelector('.ezr-toolbar').hidden;"),'Close icon did not hide the main toolbar');
+    check('主工具栏的 × 只隐藏当前页主栏，同窗口其他标签页的工具栏不受影响',await sh("return sh.querySelector('.ezr-toolbar').hidden && !!document.getElementById('ezr-root')") && await sibling.evaluate("!!document.getElementById('ezr-root')"));
+    await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:false})");
+    await until(()=>page.evaluate("!document.getElementById('ezr-root')"),'Window toolbar switch did not close the tools');
     await page.goto(base+'/paper.html?toolbar-closed');world=await page.findContext('typeof window.__ezr === "object"',{timeoutMs:15000});await pause(300);
-    check('主动关闭后再换页不会自动重开',!await page.evaluate("!!document.getElementById('ezr-root')"));
+    check('关闭窗口工具栏后再换页不会自动重开',!await page.evaluate("!!document.getElementById('ezr-root')"));
   } finally {
     if(savedTranslation)await iso(`chrome.runtime.sendMessage({type:'ezr:translation:preferences',patch:${JSON.stringify(savedTranslation)}})`).catch(()=>{});
     await iso("chrome.runtime.sendMessage({type:'ezr:window-toolbar:set',enabled:false})").catch(()=>{});
