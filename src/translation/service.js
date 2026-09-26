@@ -157,7 +157,7 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
   }
   async function translate({ slot, documentId, url, view, text, nearby = '', provider, freeform = false }, rawConfig, apiKey = '') {
     // Manual input is an explicit request, independent of the selection-translation switch.
-    const settings = freeform ? { ...rawConfig, enabled: true } : rawConfig;
+    const settings = freeform ? { ...rawConfig, enabled: true, bubbleCards: false } : rawConfig;
     const { config, safeView, entry } = await getSession({ slot, documentId, url, view, text, provider }, settings, apiKey);
     if (view.fullDocument && !slot.endsWith('/full')) {
       const fullEntry = sessions.get(`${slot}/full`);
@@ -238,9 +238,11 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
     if (!Array.isArray(texts) || !texts.length || texts.length > 8 || texts.some(text => typeof text !== 'string' || !text.trim() || text.length > 1200)
       || texts.join('').length > 2400) throw new Error('全文翻译批次过大，请重新开始。');
     const provider = input.provider || normalizeTranslation(rawConfig).provider;
-    const settings = { ...rawConfig, enabled: true };
+    const settings = normalizeTranslation(rawConfig);
+    // Full translation runs in every card mode; only the outer settings choose glossaries.
+    const textSettings = { ...settings, enabled:true, bubbleCards:false };
     const fullInput = { ...input, slot: `${input.slot}/full`, text: texts[0], provider };
-    const { entry } = await getSession(fullInput, settings, apiKey);
+    const { entry } = await getSession(fullInput, textSettings, apiKey);
     entry.fullCache ||= new Map();
     entry.fullQueue ||= Promise.resolve();
     if (provider === 'deepseek' && settings.bubbleCards) return fullWithCards(input, settings, apiKey, entry);
@@ -250,7 +252,7 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
       // Each run uses the existing plain-text translator; no JSON or alignment contract.
       const job = entry.fullQueue.then(async () => {
         ensure(entry);
-        const translated = await translate({ ...fullInput, text, nearby: '' }, settings, apiKey);
+        const translated = await translate({ ...fullInput, text, nearby: '' }, textSettings, apiKey);
         return { source: text, text: translated.text, provider, target: translated.target,
           sourceLanguage: translated.source || input.view.language || settings.source };
       });

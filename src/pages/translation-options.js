@@ -1,9 +1,12 @@
-import { LANGUAGES, MODELS, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation } from '../translation/config.js';
+import { LANGUAGES, MODELS, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation, translationModePatch } from '../translation/config.js';
+import { createTranslationMode } from '../translation/mode-control.js';
 
 const byId = id => document.getElementById(id);
 const status = byId('translation-status');
 let current = normalizeTranslation();
 let dirty = false, busy = false, revision = 0;
+const modeControl = createTranslationMode({ onChange:() => { dirty = true; dependencies(); } });
+byId('translation-mode').append(modeControl.element);
 const call = async message => {
   const reply = await chrome.runtime.sendMessage(message);
   if (!reply?.ok) throw new Error(reply?.message || '扩展后台未响应，请重新加载扩展。');
@@ -18,7 +21,8 @@ function fill(id, pairs) {
 }
 function render(reply) {
   revision++; dirty = false;
-  current = reply.config;
+  current = normalizeTranslation(reply.config);
+  modeControl.update(current);
   byId('translation-source').value = current.source;
   byId('translation-target').value = current.target;
   byId('translation-model').value = current.model;
@@ -26,7 +30,6 @@ function render(reply) {
   byId('translation-preload').checked = current.preload;
   byId('translation-explanations').checked = current.explanations;
   byId('translation-word-cards').checked = current.wordCards;
-  byId('translation-bubble-cards').checked = current.bubbleCards;
   byId('translation-auto-save').checked = current.autoSave;
   byId('translation-level').value = current.level;
   dependencies();
@@ -35,8 +38,12 @@ function render(reply) {
   byId('translation-key-state').textContent = reply.hasKey ? '已配置 DeepSeek' : '未配置 DeepSeek，免费翻译仍可使用';
 }
 function dependencies() {
-  byId('translation-auto-save').disabled = !byId('translation-word-cards').checked;
-  byId('translation-level').disabled = !byId('translation-word-cards').checked && !byId('translation-explanations').checked && !byId('translation-bubble-cards').checked;
+  const selection = modeControl.value === 'selection', bubbles = modeControl.value === 'bubbles';
+  byId('translation-preload').disabled = !selection;
+  byId('translation-word-cards').disabled = !selection;
+  byId('translation-auto-save').disabled = !selection || !byId('translation-word-cards').checked;
+  byId('translation-explanations').disabled = !selection && !bubbles;
+  byId('translation-level').disabled = (!selection && !bubbles) || (!byId('translation-word-cards').checked && !byId('translation-explanations').checked && !bubbles);
 }
 async function act(action, success) {
   busy = true;
@@ -62,7 +69,6 @@ fill('translation-model', MODELS.map(model => [model, model === 'deepseek-flash'
 fill('translation-provider', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
 fill('translation-level', ENGLISH_LEVELS);
 byId('translation-word-cards').addEventListener('change', dependencies);
-byId('translation-bubble-cards').addEventListener('change', dependencies);
 byId('translation-explanations').addEventListener('change', dependencies);
 byId('translation-save').addEventListener('click', () => act(async () => {
   const message = { type: 'ezr:translation:save', config: {
@@ -71,7 +77,7 @@ byId('translation-save').addEventListener('click', () => act(async () => {
     provider: byId('translation-provider').value, preload: byId('translation-preload').checked,
     explanations: byId('translation-explanations').checked,
     wordCards: byId('translation-word-cards').checked, autoSave: byId('translation-auto-save').checked,
-    bubbleCards: byId('translation-bubble-cards').checked,
+    ...translationModePatch(modeControl.value),
     level: byId('translation-level').value,
   } };
   const key = byId('translation-key').value.trim();

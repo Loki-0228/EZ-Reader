@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTranslationService } from '../src/translation/service.js';
 import { bubbleKey, termMatch } from '../src/ui/bubble-cards.js';
-import { normalizeTranslation } from '../src/translation/config.js';
+import { normalizeTranslation, patchTranslation, translationMode, translationModePatch } from '../src/translation/config.js';
 
 const config = { enabled:false, bubbleCards:true, source:'en', target:'zh-CN', level:'B1', provider:'deepseek' };
 const input = texts => ({ slot:'5:0', documentId:'a', url:'https://example.com/', provider:'deepseek', texts,
@@ -18,7 +18,7 @@ function setup(transform = data => data) {
   } });
   return { service, calls };
 }
-test('bubble cards stay independent of disabled selection translation and use one combined request', async () => {
+test('bubble mode disables selection translation and uses one combined request', async () => {
   const { service, calls } = setup();
   const result = await service.full(input(['The bank.', 'financial deposits']), config, 'test-key');
   assert.equal(calls.length, 1); assert.equal(result.results.length, 2);
@@ -28,6 +28,38 @@ test('bubble cards stay independent of disabled selection translation and use on
   assert.equal(calls[0].body.response_format.type, 'json_object');
   assert.equal(calls[0].payload.learnerLevel, 'B1');
   assert.equal(normalizeTranslation({ enabled:false, bubbleCards:true }).bubbleCards, true);
+});
+
+test('legacy conflicting flags migrate to usable bubbles; partial writes switch modes both ways', () => {
+  const legacy = normalizeTranslation({ enabled:true, bubbleCards:true });
+  assert.equal(legacy.enabled, false);
+  assert.equal(translationMode(legacy), 'bubbles');
+  const selection = patchTranslation(legacy, { enabled:true });
+  assert.equal(selection.bubbleCards, false);
+  assert.equal(translationMode(selection), 'selection');
+  const bubbles = patchTranslation(selection, { bubbleCards:true });
+  assert.equal(bubbles.enabled, false);
+  assert.equal(translationMode(bubbles), 'bubbles');
+  const off = patchTranslation(bubbles, translationModePatch('off'));
+  assert.equal(off.enabled, false); assert.equal(off.bubbleCards, false);
+  assert.equal(translationMode(off), 'off');
+  assert.equal(translationMode(patchTranslation(off, { target:'ja' })), 'off');
+  assert.equal(translationMode(normalizeTranslation()), 'selection');
+});
+
+test('bubble mode blocks selection requests but keeps manual input and free full translation available', async () => {
+  let calls = 0;
+  const service = createTranslationService({ fetchFn:async url => {
+    assert.ok(String(url).startsWith('https://api.mymemory.translated.net/'));
+    calls++;
+    return { ok:true, json:async () => ({ responseStatus:200, responseData:{ translatedText:'银行' } }) };
+  } });
+  const request = { ...input(['bank']), text:'bank', provider:'free' };
+  await assert.rejects(service.translate(request, config), /划词翻译已关闭/);
+  assert.equal(calls, 0);
+  assert.equal((await service.translate({ ...request, freeform:true }, config)).text, '银行');
+  assert.equal((await service.full(request, config)).results[0].text, '银行');
+  assert.equal(calls, 2);
 });
 test('combined results deduplicate concurrent requests and reuse text across level changes', async () => {
   const { service, calls } = setup();
@@ -63,19 +95,22 @@ test('duplicate IDs and malformed responses fail without poisoning retry cache',
 });
 
 test('queued card and plain requests for the same text cannot wait on each other', async () => {
-  let release;
+  let release, requestStarted;
   const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { requestStarted = resolve; });
   const calls = [];
   const service = createTranslationService({ fetchFn:async (url, options) => {
     const body = JSON.parse(options.body), payload = JSON.parse(body.messages.at(-1).content);
     calls.push(payload);
+    requestStarted();
     if (calls.length === 1) await gate;
     const content = payload.segments ? JSON.stringify({segments:payload.segments.map(segment=>({id:segment.id,text:'译文：'+segment.text,words:[]}))})
       : body.response_format ? JSON.stringify({topic:'Banking',tone:'Clear',terms:[]}) : '译文：'+payload.text;
     return {ok:true,json:async()=>({choices:[{message:{content}}]})};
   }});
   const first = service.full(input(['bank']),config,'key');
-  while (!calls.length) await new Promise(resolve=>setTimeout(resolve,1));
+  await Promise.race([started, first]);
+  assert.equal(calls.length, 1);
   const cards = service.full(input(['financial']),config,'key');
   await new Promise(resolve=>setTimeout(resolve,20));
   const plain = service.full(input(['financial']),{...config,bubbleCards:false},'key');

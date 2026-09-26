@@ -16,11 +16,30 @@ export const MAX_SELECTION = 2000;
 export const MAX_CONTEXT = 12000;
 /** Upper bound for the user's translation-style instruction. */
 export const MAX_STYLE_PROMPT = 500;
+export const TRANSLATION_MODES = Object.freeze([
+  ['selection', '划词翻译'], ['off', '关闭词卡'], ['bubbles', '泡泡词卡'],
+]);
+
+export function translationMode(config) {
+  return config.bubbleCards ? 'bubbles' : config.enabled ? 'selection' : 'off';
+}
+
+export function translationModePatch(mode) {
+  return { enabled:mode === 'selection', bubbleCards:mode === 'bubbles' };
+}
+
+/** Resolve partial writes from older toolbars as well as the three-position control. */
+export function patchTranslation(current, patch) {
+  const merged = { ...normalizeTranslation(current), ...patch };
+  if (patch.enabled === true && patch.bubbleCards !== true) merged.bubbleCards = false;
+  return normalizeTranslation(merged);
+}
 
 export function normalizeTranslation(raw = {}) {
   const valid = code => LANGUAGES.some(([value]) => code === value);
   return {
-    enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
+    // Older versions allowed both flags; honor the explicitly enabled bubble mode.
+    enabled: raw.bubbleCards !== true && (typeof raw.enabled === 'boolean' ? raw.enabled : true),
     source: raw.source === 'auto' || valid(raw.source) ? raw.source : 'auto',
     target: valid(raw.target) ? raw.target : 'zh-CN',
     textTarget: valid(raw.textTarget) ? raw.textTarget : valid(raw.target) ? raw.target : 'zh-CN',

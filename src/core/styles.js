@@ -49,6 +49,17 @@ const AUTO_THEME_FALLBACK = 'light';
  */
 export function readerCss() {
   return `/* EZ-Reader reader view. Self-contained: no network resources, no remote fonts. */
+/* Keep these shared-control rules in sync with the extension options page. */
+.ezr-translation-mode { display:inline-flex; align-items:stretch; max-width:100%; border:1px solid var(--ezr-border,var(--ui-border)); border-radius:7px; font:inherit; }
+.ezr-translation-mode > label { position:relative; display:flex; flex:1; min-width:0; margin:0; cursor:pointer; }
+.ezr-translation-mode > label > input { position:absolute; width:1px; height:1px; padding:0; margin:0; clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
+.ezr-translation-mode > label > span { display:flex; align-items:center; justify-content:center; flex:1; min-height:2.308em; box-sizing:border-box; padding:.308em .55em; white-space:nowrap; }
+.ezr-translation-mode > label:first-child > span { border-radius:6px 0 0 6px; }
+.ezr-translation-mode > label:last-child > span { border-radius:0 6px 6px 0; }
+.ezr-translation-mode input:checked + span { background:var(--ezr-accent,var(--ui-accent)); color:var(--ezr-accent-fg,var(--ui-accent-fg)); }
+.ezr-translation-mode input:focus-visible + span { outline:2px solid currentColor; outline-offset:-3px; }
+.ezr-translation-mode input:disabled + span { opacity:.55; cursor:default; }
+.ezr-translation-mode input:not(:checked):not(:disabled) + span:hover { background:color-mix(in srgb,currentColor 7%,transparent); }
 :host { all: initial; position: fixed; inset: 0; z-index: 2147483647; }
 
 :host {

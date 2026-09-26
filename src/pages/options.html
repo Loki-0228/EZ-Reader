@@ -20,15 +20,15 @@
       <section class="card translation-card" id="sec-translation" aria-labelledby="translation-heading">
         <h2 id="translation-heading" class="card__title">翻译设置</h2>
         <p class="note">选中文字后点击翻译，或开启预加载，让选区稳定后自动显示译文。</p>
-        <p class="note">划词翻译开关位于网页的翻译工具栏，开启后选中文字自动显示浮窗。</p>
+        <div id="translation-mode"></div>
+        <p class="note">划词翻译与泡泡词卡二选一；关闭词卡不影响全文翻译。此模式也可在网页翻译工具栏切换。</p>
         <label class="translation-field">当前翻译服务<select class="control" id="translation-provider"></select></label>
         <div class="translation-preferences">
           <label class="translation-toggle"><input type="checkbox" id="translation-preload" /> 划词后自动翻译（预加载）</label>
           <p class="note">只调用所选服务，不会同时请求另一种翻译 API。默认关闭；开启后，选中文字会自动发送。</p>
           <label class="translation-toggle"><input type="checkbox" id="translation-explanations" /> 生成词语讲解</label>
           <label class="translation-toggle"><input type="checkbox" id="translation-word-cards" /> 生成生词卡（可导出 Anki）</label>
-          <label class="translation-toggle"><input type="checkbox" id="translation-bubble-cards" /> 全文翻译泡泡词卡（独立于划词翻译）</label>
-          <p class="note">绿点是本篇缓存词卡，黄点是生词本词汇。点击圆点打开词卡；最小化保留圆点，关闭后本篇不再显示。泡泡词卡仅在手动加入时保存。</p>
+          <p class="note">泡泡词卡在全文翻译后显示。绿点是本篇缓存词卡，黄点是生词本词汇。点击圆点打开词卡；最小化保留圆点，关闭后本篇不再显示。泡泡词卡仅在手动加入时保存。</p>
           <label class="translation-toggle"><input type="checkbox" id="translation-auto-save" /> 将生成的卡片自动加入生词本</label>
           <p class="note">讲解、卡片、保存分别控制。可以只看讲解，也可以只生成词语与译文卡片；生成卡片不会自动保存，除非勾选上面的自动加入。</p>
           <label class="translation-field">英语水平（AI 生词难度）<select class="control" id="translation-level"></select></label>

@@ -1,5 +1,5 @@
 import { createTranslationService } from './service.js';
-import { normalizeTranslation, TRANSLATION_KEY, translationContextKey } from './config.js';
+import { normalizeTranslation, patchTranslation, TRANSLATION_KEY, translationContextKey } from './config.js';
 import { createCredentialStore } from './credentials.js';
 import { createWordbook } from './wordbook.js';
 
@@ -59,7 +59,7 @@ export function registerTranslation(chromeApi = chrome) {
         for (const key of ['enabled', 'provider', 'preload', 'source', 'target', 'textTarget', 'model', 'explanations', 'wordCards', 'bubbleCards', 'autoSave', 'level', 'stylePrompt']) {
           if (Object.hasOwn(message.patch || {}, key)) patch[key] = message.patch[key];
         }
-        const config = normalizeTranslation({ ...normalizeTranslation(bag[TRANSLATION_KEY]), ...patch });
+        const config = patchTranslation(bag[TRANSLATION_KEY], patch);
         await chromeApi.storage.local.set({ [TRANSLATION_KEY]: config });
         return { ok: true, config };
       });
@@ -95,11 +95,11 @@ export function registerTranslation(chromeApi = chrome) {
       return writeConfig(async () => {
         // Read inside the same queue as reader preferences so neither writer loses fields.
         const stored = (await chromeApi.storage.local.get(TRANSLATION_KEY))[TRANSLATION_KEY] || {};
-        const merged = normalizeTranslation(stored);
+        const patch = {};
         for (const [key, value] of Object.entries(message.config || {})) {
-          if (value !== undefined) merged[key] = value;
+          if (value !== undefined) patch[key] = value;
         }
-        const next = normalizeTranslation(merged);
+        const next = patchTranslation(stored, patch);
         if (typeof message.apiKey === 'string') {
           const apiKey = message.apiKey.trim();
           if (apiKey && !/^[\x21-\x7E]{10,256}$/.test(apiKey)) throw new Error('API Key 格式无效。');

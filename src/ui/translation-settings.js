@@ -1,4 +1,5 @@
 import { LANGUAGES, MODELS, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation } from '../translation/config.js';
+import { createTranslationMode } from '../translation/mode-control.js';
 
 /** Shared translation preferences. Credentials stay on the extension's options page. */
 export function createTranslationSettings(container, { doc = container.ownerDocument,
@@ -27,13 +28,13 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
     });
     row.append(copy, input); parent.appendChild(row); controls.set(key, input);
   };
-  container.appendChild(make('p', 'ezr-field-description', '划词翻译开关位于翻译工具栏，开启后选中文字即可显示浮窗。'));
+  const modeControl = createTranslationMode({ doc, onChange:patch => { void save(patch); } });
+  container.append(modeControl.element, make('p', 'ezr-field-description', '划词翻译与泡泡词卡二选一；关闭词卡不影响全文翻译。泡泡词卡在全文翻译后显示，绿点为缓存词卡，黄点为生词本词汇。'));
   add('preload', '划词后自动翻译', '选区稳定后，仅请求当前所选服务');
   add('provider', '翻译服务', '', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
   add('source', '原文语言', '', [['auto', '自动识别'], ...LANGUAGES]);
   add('target', '全文与划词目标语言', '也可在翻译工具栏中切换', LANGUAGES);
   add('model', 'DeepSeek 模型', '', MODELS.map(model => [model, model]));
-  add('bubbleCards', '全文翻译泡泡词卡', '关闭划词翻译后仍可使用；绿点为缓存词卡，黄点为生词本词汇');
   const learning = make('div', 'ezr-settings-learning');
   learning.appendChild(make('h4', 'ezr-settings-subtitle', '词语学习'));
   add('explanations', '生成词语讲解', '免费翻译查词典，AI 根据语境讲解', null, learning);
@@ -49,6 +50,7 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
   const selectionKeys = new Set(['preload', 'explanations', 'wordCards', 'autoSave', 'level']);
   function render() {
     if (destroyed) return;
+    modeControl.update(prefs, !ready || busy);
     for (const [key, input] of controls) {
       if (input.type === 'checkbox') input.checked = prefs[key]; else input.value = prefs[key];
       input.disabled = !ready || busy || (selectionKeys.has(key) && !prefs.enabled && !(prefs.bubbleCards && ['level','explanations'].includes(key)))

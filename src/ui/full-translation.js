@@ -4,6 +4,7 @@ import { prioritizeWebsiteGroups } from '../dom/translation-order.js';
 import { createTranslation } from './translation.js';
 import { createTranslationNotes } from './translation-notes.js';
 import { createBubbleCards, bubbleKey } from './bubble-cards.js';
+import { createTranslationMode } from '../translation/mode-control.js';
 import { closeIcon } from './close-icon.js';
 import { dockIcon } from './dock-icon.js';
 
@@ -21,7 +22,6 @@ const CSS = `
 .ezr-full-bar input[type="checkbox"] { accent-color:var(--ezr-accent); width:1em;height:1em;font:inherit; }
 .ezr-full-status{grid-column:2; color:var(--ezr-muted);font-size:.923em;line-height:1.5;overflow-wrap:anywhere;}
 .ezr-full-status:empty {display:none;}
-.ezr-full-selection-toggle {padding:0 4px;}
 .ezr-full-end {grid-column:3;grid-row:1;}
 .ezr-full-controls > * {max-width:100%;}
 .ezr-full-target-language {min-width:0;}
@@ -45,11 +45,11 @@ const CSS = `
 
 /** A document owns the translation cache, shared by website and all reader re-renders. */
 export function createFullTranslation({ doc = document, request = message => chrome.runtime.sendMessage(message), isReaderActive = () => false, onVisibilityChange = () => {} }) {
-  let bar, status, start, stop, retry, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, selectionInput, targetInput, readerTools, dockButton;
+  let bar, status, start, stop, retry, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, modeControl, targetInput, readerTools, dockButton;
   let reader = null, website = [], readerGroups = [], pdfGroups = [], notes = null, view = null;
   let enabled = false, bilingual = true, running = false, epoch = 0, revision = 0, url = doc.location.href, signature = '';
   let visible = false, originalSuspended = false, selectionPrefs = normalizeTranslation();
-  let navigationTimer = 0, savingPreferences = false, unsubscribePdf, pageStatus, bubbleInput, bubbles;
+  let navigationTimer = 0, savingPreferences = false, unsubscribePdf, pageStatus, bubbles;
   const bubbleState = { cards:new Map(), closed:new Set() };
   let activeProvider = selectionPrefs.provider;
   const cache = new Map(), failures = new Map();
@@ -69,6 +69,10 @@ export function createFullTranslation({ doc = document, request = message => chr
   };
   const message = text => { if (status) status.textContent = text; };
   const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); bubbles?.minimize(); };
+  const cardsChanged = (before, next) => next.bubbleCards !== before.bubbleCards || next.level !== before.level || next.explanations !== before.explanations;
+  function refreshCards(continueTranslation = false) {
+    if (enabled && !running && !savingPreferences && (selectionPrefs.bubbleCards || continueTranslation)) void translate();
+  }
   function bubbleSources() {
     const wordsFor = chunks => chunks.flatMap(chunk => {
       const result = cache.get(cacheKey(chunk));
@@ -112,20 +116,14 @@ export function createFullTranslation({ doc = document, request = message => chr
     targetLabel.appendChild(targetInput);
     const inputText = make('button', 'ezr-full-input', '输入文字');
     inputText.title = '输入或粘贴文字翻译';
-    const selectionLabel = make('label', 'ezr-full-selection-toggle');
-    selectionInput = make('input', 'ezr-full-selection'); selectionInput.type = 'checkbox';
-    selectionLabel.append(selectionInput, doc.createTextNode('划词翻译'));
-    selectionLabel.title = '开启后，选中文字自动显示翻译浮窗';
     const bilingualLabel = make('label', ''); bilingualInput = make('input', 'ezr-full-bilingual'); bilingualInput.type = 'checkbox'; bilingualInput.checked = true; bilingualLabel.append(bilingualInput, doc.createTextNode('双语对照'));
     const cardsLabel = make('label', ''); cardsInput = make('input', 'ezr-full-cards'); cardsInput.type = 'checkbox'; cardsInput.checked = selectionPrefs.wordCards; cardsLabel.append(cardsInput, doc.createTextNode('划词生词卡'));
     levelInput = make('select', 'ezr-full-level'); levelInput.setAttribute('aria-label', '生词卡英语水平');
     for (const [value, label] of ENGLISH_LEVELS) { const option = make('option', '', label); option.value = value; levelInput.appendChild(option); }
     levelInput.value = selectionPrefs.level;
     const settings = make('button', 'ezr-full-settings', '翻译设置'), close = make('button', 'ezr-full-close ezr-toolbar-close', ''); close.setAttribute('aria-label', '关闭翻译工具栏'); close.title = '关闭翻译工具栏'; close.appendChild(closeIcon(doc));
-    const bubbleLabel = make('label', 'ezr-full-bubble-toggle'); bubbleInput = make('input', 'ezr-full-bubbles'); bubbleInput.type = 'checkbox';
-    bubbleLabel.append(bubbleInput, doc.createTextNode('泡泡词卡'));
-    bubbleLabel.title = '独立于划词翻译；绿点为本篇词卡，黄点为生词本词汇。DeepSeek 随全文翻译生成，免费服务复用已有词卡。';
-    const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(bubbleLabel, settings);
+    modeControl = createTranslationMode({ doc, className:'ezr-full-mode', onChange:patch => { void preferences(patch); } });
+    const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(modeControl.element, settings);
     status = make('span', 'ezr-full-status', ''); status.setAttribute('aria-live', 'polite');
     pageStatus = make('span', 'ezr-full-status ezr-full-page-status', ''); pageStatus.setAttribute('aria-live', 'polite');
     readerTools = make('button', 'ezr-full-reader-tools', '阅读工具');
@@ -139,12 +137,11 @@ export function createFullTranslation({ doc = document, request = message => chr
     end.append(readerTools, dockButton, close);
     const caption = make('span', 'ezr-full-caption', '翻译');
     const controls = make('div', 'ezr-full-controls');
-    controls.append(providerInput, targetLabel, start, stop, retry, inputText, selectionLabel, bilingualLabel, cardsLabel, levelInput, preferencesGroup);
+    controls.append(providerInput, targetLabel, start, stop, retry, inputText, bilingualLabel, cardsLabel, levelInput, preferencesGroup);
     bar.append(caption, controls, end, status, pageStatus);
     for (const button of bar.querySelectorAll('button')) button.type = 'button';
     start.addEventListener('click', () => { if (enabled || running) showOriginal(); else void translate(); });
     inputText.addEventListener('click', () => { reader?.openTextTranslation?.(); });
-    selectionInput.addEventListener('change', () => { void preferences({ enabled:selectionInput.checked }); });
     stop.addEventListener('click', () => { epoch++; running = false; sync(); message('已停止，已完成的译文保留。可切回原文后继续翻译。'); });
     bilingualInput.addEventListener('change', () => { closeSelections(); bilingual = bilingualInput.checked; apply(readerGroups, true); notes?.clear(); syncBubbles(); });
     async function preferences(patch) {
@@ -152,16 +149,19 @@ export function createFullTranslation({ doc = document, request = message => chr
       savingPreferences = true;
       const before = selectionPrefs;
       if (Object.hasOwn(patch, 'target') && patch.target !== before.target) invalidate();
-      selectionPrefs = normalizeTranslation({ ...before, ...patch }); sync();
+      selectionPrefs = normalizeTranslation({ ...before, ...patch });
+      const continueTranslation = cardsChanged(before, selectionPrefs) && running;
+      if (continueTranslation) { epoch++; running = false; }
+      if (before.enabled !== selectionPrefs.enabled || before.bubbleCards !== selectionPrefs.bubbleCards) closeSelections();
+      sync();
       try {
         const result = await request({ type: 'ezr:translation:preferences', patch });
         if (!result?.ok) throw new Error(result?.message || '设置保存失败。');
         selectionPrefs = normalizeTranslation(result.config); notes?.clear(); sync();
       } catch (error) { selectionPrefs = before; message(error.message); }
       finally { savingPreferences = false; sync(); }
-      if (enabled && !running && selectionPrefs.bubbleCards && (patch.bubbleCards || patch.level)) void translate();
+      if (cardsChanged(before, selectionPrefs) || continueTranslation) refreshCards(continueTranslation);
     }
-    bubbleInput.addEventListener('change', () => { void preferences({ bubbleCards:bubbleInput.checked }); });
     cardsInput.addEventListener('change', () => { void preferences({ wordCards: cardsInput.checked }); });
     levelInput.addEventListener('change', () => { void preferences({ level: levelInput.value }); });
     providerInput.addEventListener('change', () => { void preferences({ provider: providerInput.value }); });
@@ -196,8 +196,9 @@ export function createFullTranslation({ doc = document, request = message => chr
     dockButton.title = dockLabel;
     dockButton.setAttribute('aria-label', dockLabel);
     dockButton.setAttribute('aria-pressed', String(atBottom));
-    for (const input of [providerInput, targetInput, selectionInput, cardsInput, levelInput, bubbleInput]) input.disabled = savingPreferences;
-    bubbleInput.disabled ||= running; levelInput.disabled ||= running;
+    for (const input of [providerInput, targetInput, cardsInput, levelInput]) input.disabled = savingPreferences;
+    modeControl.update(selectionPrefs, savingPreferences);
+    levelInput.disabled ||= running;
     start.disabled = savingPreferences; start.textContent = enabled || running ? '显示原文' : '全文翻译';
     start.setAttribute('aria-pressed', String(enabled || running));
     stop.hidden = !running;
@@ -210,12 +211,11 @@ export function createFullTranslation({ doc = document, request = message => chr
     const renderPages = reader?.pdfTranslation?.state.failedPages || [];
     pageStatus.textContent = pages.length ? '第 ' + pages.join('、') + ' 页未完成。'
       + (renderPages.length ? '其中第 ' + renderPages.join('、') + ' 页译文显示失败。' : '') + '可点击「重试失败页」，已有译文会保留。' : '';
-    selectionInput.checked = selectionPrefs.enabled;
     bilingualInput.checked = bilingual; bilingualInput.parentElement.hidden = !isReaderActive();
     cardsInput.parentElement.hidden = !isReaderActive() || !selectionPrefs.enabled;
     levelInput.hidden = (!isReaderActive() || !selectionPrefs.enabled) && !selectionPrefs.bubbleCards;
     cardsInput.checked = selectionPrefs.wordCards; levelInput.value = selectionPrefs.level;
-    bubbleInput.checked = selectionPrefs.bubbleCards; syncBubbles();
+    syncBubbles();
   }
   function place() {
     if (!bar || !reader) return;
@@ -363,9 +363,9 @@ export function createFullTranslation({ doc = document, request = message => chr
   const storageChanged = (changes, area) => {
     if (area !== 'local' || !changes[TRANSLATION_KEY]) return;
     const next = normalizeTranslation(changes[TRANSLATION_KEY].newValue);
-    if (running && (next.bubbleCards !== selectionPrefs.bubbleCards || next.level !== selectionPrefs.level || next.explanations !== selectionPrefs.explanations)) {
-      epoch++; running = false; message('词卡设置已改变，已完成译文保留。切回原文后再次翻译即可继续。');
-    }
+    const changedCards = cardsChanged(selectionPrefs, next);
+    const continueTranslation = running && changedCards;
+    if (continueTranslation) { epoch++; running = false; }
     const nextSignature = JSON.stringify([next.source, next.target, next.model, next.stylePrompt]);
     if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; }
     if (activeProvider !== next.provider) {
@@ -377,7 +377,9 @@ export function createFullTranslation({ doc = document, request = message => chr
       if (status) status.textContent = '翻译服务已切换，点击全文翻译；已有结果会保留在缓存中。';
     }
     if (!next.wordCards || !next.enabled || next.level !== selectionPrefs.level || next.explanations !== selectionPrefs.explanations) notes?.clear();
+    if (next.enabled !== selectionPrefs.enabled || next.bubbleCards !== selectionPrefs.bubbleCards) closeSelections();
     selectionPrefs = next; sync();
+    if (changedCards) refreshCards(continueTranslation);
   };
   chrome.storage.onChanged.addListener(storageChanged);
   // SPA navigation must also invalidate a stopped or fully translated view.
