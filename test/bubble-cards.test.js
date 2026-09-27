@@ -30,6 +30,54 @@ test('bubble mode disables selection translation and uses one combined request',
   assert.equal(normalizeTranslation({ enabled:false, bubbleCards:true }).bubbleCards, true);
 });
 
+test('standalone bubbles use a distinct prompt, never fill translation cache, and feed later combined requests', async () => {
+  const { service, calls } = setup();
+  const page = input(['The bank.']);
+  const [first, concurrent] = await Promise.all([service.full({ ...page, cardsOnly:true }, config, 'key'), service.full({ ...page, cardsOnly:true }, config, 'key')]);
+  assert.equal(calls.length, 1);
+  assert.equal(first.results[0].text, undefined);
+  assert.equal(concurrent.results[0].words[0].term, 'bank');
+  assert.equal(calls[0].payload.segments[0].existingTranslation, undefined);
+  assert.match(calls[0].body.messages[0].content, /不翻译全文或整段/);
+  const translated = await service.full(page, config, 'key');
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].body.messages[0].content, calls[1].body.messages[0].content);
+  assert.equal(calls[1].payload.segments[0].existingTranslation, '');
+  assert.equal(calls[1].payload.segments[0].existingWords[0].term, 'bank');
+  assert.ok(translated.results[0].text);
+  const original = await service.full({ ...page, cardsOnly:true }, config, 'key');
+  assert.equal(calls.length, 2); assert.equal(original.results[0].text, undefined);
+});
+
+test('standalone malformed segments retry without discarding successful cards or blocking combined translation', async () => {
+  let broken = true;
+  const { service, calls } = setup(data => ({ segments:data.segments.map((item, index) => broken && index === 1 ? { ...item, words:null } : item) }));
+  const page = { ...input(['The bank.', 'financial deposits']), cardsOnly:true };
+  const first = await service.full(page, config, 'key');
+  assert.ok(first.error); assert.equal(first.results.length, 1);
+  broken = false;
+  assert.equal((await service.full(page, config, 'key')).results.length, 2);
+  assert.deepEqual(calls[1].payload.segments.map(item => item.text), ['financial deposits']);
+  assert.equal((await service.full({ ...page, cardsOnly:false }, config, 'key')).results.length, 2);
+});
+
+test('standalone bubbles never call a paid or free provider outside DeepSeek bubble mode', async () => {
+  const { service, calls } = setup();
+  await service.full({ ...input(['bank']), cardsOnly:true, provider:'free' }, config);
+  await service.full({ ...input(['bank']), cardsOnly:true }, { ...config, bubbleCards:false }, 'key');
+  assert.equal(calls.length, 0);
+});
+
+test('switching to original text during a combined request shares the in-flight glossary', async () => {
+  const { service, calls } = setup();
+  const page = input(['The bank.']);
+  const [translated, original] = await Promise.all([service.full(page, config, 'key'), service.full({ ...page, cardsOnly:true }, config, 'key')]);
+  assert.equal(calls.length, 1);
+  assert.ok(translated.results[0].text);
+  assert.equal(original.results[0].text, undefined);
+  assert.equal(original.results[0].words[0].term, 'bank');
+});
+
 test('legacy conflicting flags migrate to usable bubbles; partial writes switch modes both ways', () => {
   const legacy = normalizeTranslation({ enabled:true, bubbleCards:true });
   assert.equal(legacy.enabled, false);

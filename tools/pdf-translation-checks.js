@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { CdpPage, CdpSession, waitForEndpoint } from './cdp.js';
 import { pdfOriginalChecks } from './pdf-original-checks.js';
 import { pdfReaderChecks } from './pdf-reader-checks.js';
+import { pdfBubbleChecks } from './pdf-bubble-checks.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifacts = path.join(root, 'test-artifacts', 'pdf-translation');
@@ -62,6 +63,7 @@ try {
   const { sessionId: workerSession } = await session.send('Target.attachToTarget', { targetId: worker.targetId, flatten: true });
   const calls = []; let failSecond = true, delayNext = 0;
   session.on('Fetch.requestPaused', async event => {
+    if (!event.request.url.startsWith('https://api.mymemory.translated.net/')) return;
     const source = new URL(event.request.url).searchParams.get('q'); calls.push(source);
     const wait=delayNext; delayNext=0; if(wait)await pause(wait);
     const failed = failSecond && source.startsWith('Second');
@@ -285,6 +287,7 @@ try {
   const formulaPath=path.join(artifacts,'formulas.pdf'),formulaBytes=fixturePdf(true);
   await writeFile(formulaPath,formulaBytes,'ascii');
   await pdfOriginalChecks({ page,session,control,calls,check,loadFile,formulaPath,formulaBytes,artifacts,setFailure:value=>{failSecond=value;},delayRequest:ms=>{delayNext=ms;} });
+  await pdfBubbleChecks({page,session,workerSession,extensionOrigin,control,check,loadFile,artifacts});
   }
   if (process.env.EZR_SAMPLE_PDF) {
     const sample = path.resolve(process.env.EZR_SAMPLE_PDF);

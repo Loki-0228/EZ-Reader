@@ -21,8 +21,8 @@ const CSS = `
 .ezr-bubbles{position:fixed;inset:0;pointer-events:none;z-index:60;color:var(--ezr-fg)}
 .ezr-bubbles [hidden]{display:none!important}
 .ezr-bubble-dot{position:fixed;width:24px;height:24px;padding:0;border:0;background:transparent;cursor:pointer;pointer-events:auto;border-radius:50%}
-.ezr-bubble-dot::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#21804c;opacity:.5}
-.ezr-bubble-dot[data-saved=true]::before{background:#ba8a08}
+.ezr-bubble-dot::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);box-sizing:border-box;width:8px;height:8px;border:1px solid #125b32;border-radius:50%;background:#21804c;opacity:.7}
+.ezr-bubble-dot[data-saved=true]::before{background:#ba8a08;border-color:#765500}
 .ezr-bubble-dot:hover::before,.ezr-bubble-dot[aria-expanded=true]::before{width:10px;height:10px}
 .ezr-bubbles :is(button,a):focus-visible{outline:2px solid var(--ezr-accent);outline-offset:2px}
 .ezr-bubble-card{position:fixed;box-sizing:border-box;pointer-events:auto;background:var(--ezr-bg);color:var(--ezr-fg);border-radius:12px;padding:18px;box-shadow:0 6px 24px #0003;font:14px/1.6 'Segoe UI','Microsoft YaHei',sans-serif;overflow:auto;overflow-wrap:anywhere;text-transform:none;user-select:text}
@@ -38,6 +38,8 @@ const CSS = `
 .ezr-bubble-meta,.ezr-bubble-status{color:var(--ezr-muted);font-size:12px}
 .ezr-bubble-actions{margin-top:16px}
 .ezr-bubble-card a{color:var(--ezr-accent)}
+.ezr-bubble-all{position:fixed;box-sizing:border-box;right:10px;width:min(760px,calc(100vw - 20px));overflow:auto;pointer-events:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:12px;padding:8px;border:1px solid var(--ezr-border);border-radius:14px;background:var(--ezr-bg);box-shadow:0 6px 24px #0003;overscroll-behavior:contain}
+.ezr-bubble-all .ezr-bubble-card{position:relative;border:1px solid var(--ezr-border);box-shadow:none;min-width:0;overflow:visible}
 @media(forced-colors:active){.ezr-bubble-dot::before{background:ButtonText;outline:1px solid Canvas;opacity:1}.ezr-bubble-dot[data-saved=true]::before{border-radius:0}.ezr-bubble-card{border:1px solid CanvasText}}
 `;
 
@@ -48,13 +50,17 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   layer.setAttribute('aria-label', '泡泡词卡'); root.append(style, layer);
   const panel = make('section', 'ezr-bubble-card'); panel.hidden = true; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '泡泡词卡');
   layer.appendChild(panel);
+  const allPanel = make('section', 'ezr-bubble-all'); allPanel.hidden = true; allPanel.setAttribute('aria-label', '全部泡泡词卡'); layer.appendChild(allPanel);
+  const folded = new Set();
+  let focusId;
   const abort = new AbortController(), scroller = article.parentElement;
   const measure = doc.createElement('canvas').getContext('2d'), metricsCache = new Map();
   const segmenter = new Intl.Segmenter(undefined, { granularity:'grapheme' });
   let settings = { active:false }, saved = [], entries = [], opened = null, frame = 0, rebuild = false, destroyed = false, selectionTimer;
   function minimize(focus = false) {
-    const previous = opened; opened = null; panel.hidden = true;
-    previous?.button.setAttribute('aria-expanded', 'false');
+    const previous = opened || entries.find(entry => entry.id === focusId); opened = null; panel.hidden = true;
+    allPanel.hidden = true; allPanel.replaceChildren(); folded.clear();
+    for (const entry of entries) entry.button.setAttribute('aria-expanded', 'false');
     if (focus) previous?.button.focus({ preventScroll:true });
   }
   function contentViewport() {
@@ -69,6 +75,11 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     return { top, bottom, left:0, right:doc.documentElement.clientWidth };
   }
   function position() {
+    if (!allPanel.hidden) {
+      const viewport = contentViewport();
+      allPanel.style.width = `${Math.min(760, doc.documentElement.clientWidth - 20)}px`;
+      allPanel.style.top = `${viewport.top + 10}px`; allPanel.style.maxHeight = `${Math.max(60, viewport.bottom - viewport.top - 20)}px`;
+    }
     if (!opened) return;
     const rect = opened.range.getBoundingClientRect(), width = Math.min(360, doc.documentElement.clientWidth - 20), viewport = contentViewport();
     panel.style.width = `${width}px`; panel.style.maxHeight = `${Math.max(60, viewport.bottom - viewport.top - 24)}px`;
@@ -78,8 +89,21 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     panel.style.top = `${top + height > viewport.bottom - 10 ? Math.max(viewport.top + 10, rect.top - height - 10) : top}px`;
   }
   function open(entry, focus = false) {
-    minimize(); opened = entry; panel.replaceChildren(); panel.hidden = false;
+    minimize(); opened = entry; focusId = entry.id; panel.replaceChildren(); panel.hidden = false;
     entry.button.setAttribute('aria-expanded', 'true');
+    renderCard(entry, panel);
+    position(); if (focus) panel.querySelector('.ezr-bubble-minimize').focus({ preventScroll:true });
+  }
+  function expandAll(keepFolded = false, focus = false) {
+    const previousFolded = keepFolded ? [...folded] : [];
+    minimize(); for (const key of previousFolded) folded.add(key);
+    const unique = new Map(entries.filter(entry => !folded.has(bubbleKey(entry.card))).map(entry => [bubbleKey(entry.card), entry]));
+    for (const entry of unique.values()) { const cardPanel = make('section', 'ezr-bubble-card'); renderCard(entry, cardPanel); allPanel.appendChild(cardPanel); }
+    allPanel.hidden = !unique.size;
+    for (const entry of entries) entry.button.setAttribute('aria-expanded', String(unique.has(bubbleKey(entry.card))));
+    position(); if (focus) allPanel.querySelector('.ezr-bubble-collapse-all')?.focus({ preventScroll:true });
+  }
+  function renderCard(entry, panel) {
     const card = entry.card, key = bubbleKey(card), head = make('div', 'ezr-bubble-head');
     const min = make('button', 'ezr-bubble-minimize'), close = make('button', 'ezr-bubble-close');
     for (const button of [min, close]) button.type = 'button';
@@ -92,12 +116,19 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     for (const text of [card.meaning !== card.translation ? card.meaning : '', card.usage, card.example, card.exampleTranslation]) if (text) panel.append(make('p', '', text));
     const info = make('p', 'ezr-bubble-status', entry.saved ? '已在生词本 · 黄点' : '本篇已缓存 · 绿点'); info.setAttribute('role', 'status');
     const footer = make('div', 'ezr-bubble-actions'), save = make('button', 'ezr-bubble-save', entry.saved ? '已加入生词本' : '加入生词本'), download = make('button', '', '导出 Anki');
-    save.type = download.type = 'button'; save.disabled = entry.saved; footer.append(save, download); panel.append(footer, info);
+    const expand = make('button', 'ezr-bubble-expand-all', '全部展开'), collapse = make('button', 'ezr-bubble-collapse-all', '全部收起');
+    save.type = download.type = expand.type = collapse.type = 'button'; save.disabled = entry.saved;
+    footer.append(save, download, expand, collapse); panel.append(footer, info);
+    expand.addEventListener('click', () => expandAll(false, true));
+    collapse.addEventListener('click', () => minimize(true));
     if (card.provider === 'dictionary' && card.dictionaryUrl) {
       const source = make('a', 'ezr-bubble-meta', `词典来源${card.license ? ' · ' + card.license : ''}`); source.href = card.dictionaryUrl; source.target = '_blank'; source.rel = 'noopener noreferrer'; panel.append(source);
     } else if (card.provider === 'ai') panel.append(make('p', 'ezr-bubble-meta', `AI 生成 · ${card.level || '当前语境'}`));
-    min.addEventListener('click', () => minimize(true));
-    close.addEventListener('click', () => { state.closed.add(key); state.cards.delete(key); minimize(); schedule(true); });
+    min.addEventListener('click', () => {
+      if (allPanel.hidden) minimize(true);
+      else { folded.add(key); expandAll(true); entry.button.focus({ preventScroll:true }); }
+    });
+    close.addEventListener('click', () => { state.closed.add(key); state.cards.delete(key); if (allPanel.hidden) minimize(); schedule(true); });
     save.addEventListener('click', async () => {
       save.disabled = true;
       try {
@@ -110,12 +141,11 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
       } catch (error) { if (!destroyed) { save.disabled = false; info.textContent = error.message; } }
     });
     download.addEventListener('click', () => downloadWordCards([card], 'anki', doc));
-    position(); if (focus) min.focus({ preventScroll:true });
   }
   function updateDot(entry) {
     entry.button.dataset.saved = String(entry.saved);
-    entry.button.setAttribute('aria-label', `${entry.card.term}：${entry.saved ? '已在生词本，黄点' : '已缓存词卡，绿点'}，打开词卡`);
-    entry.button.title = entry.button.getAttribute('aria-label');
+    entry.button.title = `${entry.card.term}：${entry.card.translation}`;
+    entry.button.setAttribute('aria-label', `${entry.button.title}，${entry.saved ? '已在生词本，黄点' : '已缓存词卡，绿点'}，打开词卡`);
   }
   function rangeOf(nodes, match) {
     const range = doc.createRange(); let offset = 0, start = false;
@@ -161,6 +191,7 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   }
   function build() {
     const previousKey = opened?.id, hadFocus = panel.contains(root.getRootNode().activeElement);
+    const wasAll = !allPanel.hidden, previousFolded = [...folded], scrollTop = allPanel.scrollTop;
     minimize(); entries.forEach(entry => entry.button.remove()); entries = [];
     if (!settings.active) return;
     const wordbook = new Map(saved.filter(card => card.targetLanguage.toLowerCase() === settings.target.toLowerCase()).map(card => [bubbleKey(card), card]));
@@ -169,7 +200,7 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     for (const source of sources) for (const word of source.words || []) {
       try { const card = normalize(word); if (!state.closed.has(bubbleKey(card))) available.set(bubbleKey(card), card); } catch { /* Ignore invalid cards. */ }
     }
-    for (const [index, source] of sources.entries()) {
+    sourceLoop: for (const [index, source] of sources.entries()) {
       const nodes = source.nodes.filter(node => node.isConnected && node.data), text = nodes.map(node => node.data).join('');
       if (!text.trim()) continue;
       const cards = new Map(available);
@@ -190,9 +221,10 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
         updateDot(entry); button.addEventListener('click', event => { event.stopPropagation(); open(entry, event.detail === 0); });
         entries.push(entry); layer.insertBefore(button, panel);
         if (entry.id === previousKey) open(entry, hadFocus);
-        if (entries.length >= 600) return;
+        if (entries.length >= 600) break sourceLoop;
       }
     }
+    if (wasAll) { for (const key of previousFolded) folded.add(key); expandAll(true); allPanel.scrollTop = scrollTop; }
   }
   function layout() {
     frame = 0; if (destroyed) return;
@@ -229,8 +261,8 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   doc.fonts?.addEventListener('loadingdone', () => { metricsCache.clear(); schedule(); }, { signal:abort.signal });
   doc.addEventListener('scroll', () => schedule(), { capture:true, passive:true, signal:abort.signal });
   doc.defaultView.addEventListener('resize', () => schedule(), { signal:abort.signal });
-  doc.addEventListener('pointerdown', event => { if (!event.composedPath().includes(layer)) minimize(); }, { capture:true, signal:abort.signal });
-  doc.addEventListener('keydown', event => { if (event.key === 'Escape' && opened) { event.stopPropagation(); minimize(true); } }, { capture:true, signal:abort.signal });
+  doc.addEventListener('pointerdown', event => { if (allPanel.hidden && !event.composedPath().includes(layer)) minimize(); }, { capture:true, signal:abort.signal });
+  doc.addEventListener('keydown', event => { if (event.key === 'Escape' && (opened || !allPanel.hidden)) { event.stopPropagation(); minimize(true); } }, { capture:true, signal:abort.signal });
   function selection() {
     if (!settings.active || settings.selectionEnabled || root.querySelector('.ezr-settings.is-open')) return;
     const snapshot = readUserSelection({ doc, root:settings.original ? doc.body : article, exclude:layer, domText:true });
@@ -242,7 +274,7 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   for (const type of ['selectionchange', 'pointerup', 'keyup']) doc.addEventListener(type, () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(selection, 100); }, { signal:abort.signal });
   return {
     update(next) { settings = next; schedule(true); }, refresh() { schedule(true); }, minimize,
-    get isOpen() { return !panel.hidden; },
+    get isOpen() { return !panel.hidden || !allPanel.hidden; },
     destroy() { destroyed = true; minimize(); abort.abort(); observe.disconnect(); size.disconnect(); clearTimeout(selectionTimer); doc.defaultView.cancelAnimationFrame(frame); chrome.storage.onChanged.removeListener(bookChanged); layer.remove(); style.remove(); },
   };
 }

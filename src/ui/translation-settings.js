@@ -29,7 +29,7 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
     row.append(copy, input); parent.appendChild(row); controls.set(key, input);
   };
   const modeControl = createTranslationMode({ doc, onChange:patch => { void save(patch); } });
-  container.append(modeControl.element, make('p', 'ezr-field-description', '划词翻译与泡泡词卡二选一；关闭词卡不影响全文翻译。泡泡词卡在全文翻译后显示，绿点为缓存词卡，黄点为生词本词汇。'));
+  container.append(modeControl.element, make('p', 'ezr-field-description', '划词翻译与泡泡词卡二选一；关闭词卡不影响全文翻译。泡泡可单独用于原文，也可配合全文翻译。绿点为缓存词卡，黄点为生词本词汇。'));
   add('preload', '划词后自动翻译', '选区稳定后，仅请求当前所选服务');
   add('provider', '翻译服务', '', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
   add('source', '原文语言', '', [['auto', '自动识别'], ...LANGUAGES]);

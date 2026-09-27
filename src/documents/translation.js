@@ -247,6 +247,7 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     } finally { retrying = false; notify(); schedule(); }
   }
   for (const name of ['pagerendered','scalechanging','pagechanging']) eventBus.on(name,schedule);
+  eventBus.on('textlayerrendered',notify);
   container.addEventListener('scroll',schedule,{ passive:true });
 
   async function exportPreview(target, onProgress = () => {}) {
@@ -349,7 +350,24 @@ export function createPdfTranslation({ viewer, eventBus, container, getPdf, prep
     }
     syncEditLayers(); publish(); schedule();
   }
-  return { prepare:prepareGroups, apply, restore, reset, exportPreview, applyFontSize, applyAlignment, retryFailedPages, markOriginal,
+  function bubbleSources() {
+    const nodesOf = element => {
+      if (!element) return [];
+      const walker = document.createTreeWalker(element,4), nodes = []; let node;
+      while ((node = walker.nextNode())) nodes.push(node);
+      return nodes;
+    };
+    return (parsed?.pages || []).flatMap(page => {
+      const view = viewer.getPageView(page.number - 1);
+      const translated = new Map([...view?.div?.querySelectorAll('.ezr-pdf-text') || []].map(node => [node.dataset.box,node]));
+      const textDivs = view?.textLayer?.highlighter?.textDivs || [];
+      return page.boxes.map(box => {
+        const id = key(page.number,box), element = translated.get(id);
+        return { id, translated:!!element, nodes:element ? nodesOf(element) : box.items.flatMap(item => nodesOf(textDivs[item.index])) };
+      });
+    });
+  }
+  return { prepare:prepareGroups, apply, restore, reset, exportPreview, applyFontSize, applyAlignment, retryFailedPages, markOriginal, bubbleSources,
     isOriginal:id => originals.has(id),
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     setEditing:value => { syncEditLayers(); return editor.setActive(value); },

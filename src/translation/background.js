@@ -137,7 +137,7 @@ export function registerTranslation(chromeApi = chrome) {
       view: isText ? { ...message.view, fullDocument:false } : message.view, text: message.text, nearby: message.nearby, provider,
       freeform: message.type === 'ezr:translation:text',
       translation: message.translation, sourceLanguage: message.sourceLanguage,
-      texts: message.texts, excludeTerms: message.excludeTerms,
+      texts: message.texts, excludeTerms: message.excludeTerms, cardsOnly: message.cardsOnly === true,
     }, requestConfig, provider === 'deepseek' ? await credentials.get() : '');
     return { ok: true, ...result };
   }

@@ -53,10 +53,17 @@ export function createFullTranslation({ doc = document, request = message => chr
   const bubbleState = { cards:new Map(), closed:new Set() };
   let activeProvider = selectionPrefs.provider;
   const cache = new Map(), failures = new Map();
+  const cardCache = new Map(), cardFailures = new Map();
+  let cardsOnlyRun = false;
   const make = (tag, cls, text) => { const element = doc.createElement(tag); element.className = cls; if (text) element.textContent = text; return element; };
   const cacheKey = (text, provider = activeProvider) => JSON.stringify([provider, text]);
   const pdfAllowed = group => !reader?.pdfTranslation?.isOriginal?.(group.id);
   const textAllowed = text => !reader?.isPdf || pdfGroups.some(group => pdfAllowed(group) && group.chunks.includes(text));
+  const failedCardTexts = (provider = activeProvider) => [...cardFailures.values()].filter(item => {
+    const result = cardCache.get(cacheKey(item.source, provider));
+    return item.provider === provider && textAllowed(item.source)
+      && (!result || result.wordsLevel !== selectionPrefs.level || result.wordsExplanations !== selectionPrefs.explanations);
+  }).map(item => item.source);
   const failedTexts = (provider = activeProvider) => [...failures.values()]
     .filter(item => item.provider === provider && textAllowed(item.source) && (!cache.has(cacheKey(item.source, provider)) || (item.cards && selectionPrefs.bubbleCards
       && (cache.get(cacheKey(item.source, provider))?.wordsLevel !== item.level || cache.get(cacheKey(item.source, provider))?.wordsExplanations !== item.explanations)
@@ -71,30 +78,27 @@ export function createFullTranslation({ doc = document, request = message => chr
   const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); bubbles?.minimize(); };
   const cardsChanged = (before, next) => next.bubbleCards !== before.bubbleCards || next.level !== before.level || next.explanations !== before.explanations;
   function refreshCards(continueTranslation = false) {
-    if (enabled && !running && !savingPreferences && (selectionPrefs.bubbleCards || continueTranslation)) void translate();
+    if (!running && !savingPreferences && (selectionPrefs.bubbleCards || continueTranslation)) void translate(false, !enabled && !continueTranslation);
   }
   function bubbleSources() {
     const wordsFor = chunks => chunks.flatMap(chunk => {
-      const result = cache.get(cacheKey(chunk));
+      const result = cardCache.get(cacheKey(chunk));
       return result?.wordsLevel === selectionPrefs.level && result.wordsExplanations === selectionPrefs.explanations ? result.words || [] : [];
     });
     if (reader?.isPdf && !isReaderActive()) {
-      const elements = new Map([...doc.querySelectorAll('.ezr-pdf-text')].map(node => [node.dataset.box, node]));
-      return pdfGroups.flatMap(group => {
-      const element = elements.get(group.id);
-      if (!element) return [];
-      const walker = doc.createTreeWalker(element, 4), nodes = []; let node;
-      while ((node = walker.nextNode())) nodes.push(node);
-      return [{ nodes, source:group.source, words:wordsFor(group.chunks), translated:true }];
+      const sources = new Map((reader.pdfTranslation?.bubbleSources() || []).map(source => [source.id, source]));
+      return pdfGroups.map(group => {
+        const source = sources.get(group.id);
+        return { nodes:source?.nodes || [], source:group.source, words:wordsFor(group.chunks), translated:source?.translated || false };
       });
     }
-    return (isReaderActive() ? readerGroups : website).map(group => ({
+    return (isReaderActive() ? readerGroups : website).flatMap(group => [{
       nodes:group.runs.flatMap(run => run.inserted ? [run.inserted] : run.nodes.map(item => item.node)),
       source:group.source, words:wordsFor(group.chunks), translated:!!group.appliedResults && !group.appliedMode,
-    }));
+    }, ...(group.target ? [{ nodes:[group.target.firstChild], source:group.source, words:wordsFor(group.chunks), translated:true }] : [])]);
   }
   function syncBubbles() {
-    bubbles?.update({ active:enabled && selectionPrefs.bubbleCards && !originalSuspended && !(reader?.isPdf && !isReaderActive() && reader.pdfTranslation?.state.editing),
+    bubbles?.update({ active:selectionPrefs.bubbleCards && !originalSuspended && !(reader?.isPdf && !isReaderActive() && reader.pdfTranslation?.state.editing),
       target:selectionPrefs.target, selectionEnabled:selectionPrefs.enabled, original:!isReaderActive() });
   }
   function ensureUI() {
@@ -103,7 +107,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     bar = make('div', 'ezr-full-bar'); bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', '翻译工具栏'); bar.id = 'ezr-translation-bar'; bar.hidden = true;
     start = make('button', 'ezr-full-start', '全文翻译'); stop = make('button', 'ezr-full-stop', '停止'); stop.hidden = true;
     retry = make('button', 'ezr-full-retry', '重试失败项'); retry.hidden = true;
-    retry.addEventListener('click', () => { void translate(true); });
+    retry.addEventListener('click', () => { void translate(true, !enabled && selectionPrefs.bubbleCards && failedCardTexts().length > 0); });
     providerInput = make('select', 'ezr-full-provider'); providerInput.setAttribute('aria-label', '全文翻译服务');
     for (const [value, label] of [['free', '免费翻译'], ['deepseek', 'DeepSeek']]) { const option = make('option', '', label); option.value = value; providerInput.appendChild(option); }
     providerInput.value = selectionPrefs.provider;
@@ -140,9 +144,12 @@ export function createFullTranslation({ doc = document, request = message => chr
     controls.append(providerInput, targetLabel, start, stop, retry, inputText, bilingualLabel, cardsLabel, levelInput, preferencesGroup);
     bar.append(caption, controls, end, status, pageStatus);
     for (const button of bar.querySelectorAll('button')) button.type = 'button';
-    start.addEventListener('click', () => { if (enabled || running) showOriginal(); else void translate(); });
+    start.addEventListener('click', () => {
+      if (enabled || (running && !cardsOnlyRun)) showOriginal();
+      else { if (running) { epoch++; running = false; } void translate(); }
+    });
     inputText.addEventListener('click', () => { reader?.openTextTranslation?.(); });
-    stop.addEventListener('click', () => { epoch++; running = false; sync(); message('已停止，已完成的译文保留。可切回原文后继续翻译。'); });
+    stop.addEventListener('click', () => { epoch++; running = false; sync(); message(cardsOnlyRun ? '已停止生成词卡，已有泡泡保留。重新开启泡泡可继续。' : '已停止，已完成的译文保留。可切回原文后继续翻译。'); });
     bilingualInput.addEventListener('change', () => { closeSelections(); bilingual = bilingualInput.checked; apply(readerGroups, true); notes?.clear(); syncBubbles(); });
     async function preferences(patch) {
       if (savingPreferences) return;
@@ -150,8 +157,8 @@ export function createFullTranslation({ doc = document, request = message => chr
       const before = selectionPrefs;
       if (Object.hasOwn(patch, 'target') && patch.target !== before.target) invalidate();
       selectionPrefs = normalizeTranslation({ ...before, ...patch });
-      const continueTranslation = cardsChanged(before, selectionPrefs) && running;
-      if (continueTranslation) { epoch++; running = false; }
+      const continueTranslation = cardsChanged(before, selectionPrefs) && running && !cardsOnlyRun;
+      if (cardsChanged(before, selectionPrefs) && running) { epoch++; running = false; }
       if (before.enabled !== selectionPrefs.enabled || before.bubbleCards !== selectionPrefs.bubbleCards) closeSelections();
       sync();
       try {
@@ -160,7 +167,7 @@ export function createFullTranslation({ doc = document, request = message => chr
         selectionPrefs = normalizeTranslation(result.config); notes?.clear(); sync();
       } catch (error) { selectionPrefs = before; message(error.message); }
       finally { savingPreferences = false; sync(); }
-      if (cardsChanged(before, selectionPrefs) || continueTranslation) refreshCards(continueTranslation);
+      if (cardsChanged(before, selectionPrefs) || continueTranslation || before.provider !== selectionPrefs.provider || before.target !== selectionPrefs.target) refreshCards(continueTranslation);
     }
     cardsInput.addEventListener('change', () => { void preferences({ wordCards: cardsInput.checked }); });
     levelInput.addEventListener('change', () => { void preferences({ level: levelInput.value }); });
@@ -172,7 +179,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original',
       isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: () => view,
       getDocument: () => ({ title: doc.title, blocks: [] }) });
-    void request({ type: 'ezr:translation:config' }).then(result => { if (result?.ok) { selectionPrefs = normalizeTranslation(result.config); sync(); } }).catch(() => {});
+    void request({ type: 'ezr:translation:config' }).then(result => { if (result?.ok) { selectionPrefs = normalizeTranslation(result.config); sync(); refreshCards(); } }).catch(() => {});
     place();
   }
   function showOriginal() {
@@ -180,6 +187,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); notes?.clear();
     reader?.pdfTranslation?.restore();
     sync(); message('已显示原文，再次翻译会复用已有结果。');
+    refreshCards();
   }
   function sync() {
     if (!bar) return;
@@ -199,15 +207,17 @@ export function createFullTranslation({ doc = document, request = message => chr
     for (const input of [providerInput, targetInput, cardsInput, levelInput]) input.disabled = savingPreferences;
     modeControl.update(selectionPrefs, savingPreferences);
     levelInput.disabled ||= running;
-    start.disabled = savingPreferences; start.textContent = enabled || running ? '显示原文' : '全文翻译';
-    start.setAttribute('aria-pressed', String(enabled || running));
+    const translating = enabled || (running && !cardsOnlyRun);
+    start.disabled = savingPreferences; start.textContent = translating ? '显示原文' : '全文翻译';
+    start.setAttribute('aria-pressed', String(translating));
     stop.hidden = !running;
-    const pages = failedPageNumbers(), failed = reader?.isPdf ? pages.length : failedTexts().length;
+    const cardRetry = !enabled && selectionPrefs.bubbleCards && failedCardTexts().length > 0;
+    const pages = failedPageNumbers(), failed = cardRetry ? failedCardTexts().length : reader?.isPdf ? pages.length : failedTexts().length;
     retry.hidden = failed === 0;
     retry.disabled = running || savingPreferences || !!reader?.pdfTranslation?.state.retrying;
-    retry.textContent = (reader?.isPdf ? '重试失败页' : '重试失败项') + '（' + failed + '）';
-    retry.setAttribute('aria-label', reader?.isPdf ? '重试第 ' + pages.join('、') + ' 页' : '重试 ' + failed + ' 个翻译失败项');
-    retry.title = reader?.isPdf ? '重试失败页中的未完成内容，复用已有译文' : '只重试未成功的翻译片段';
+    retry.textContent = (cardRetry ? '重试失败词卡' : reader?.isPdf ? '重试失败页' : '重试失败项') + '（' + failed + '）';
+    retry.setAttribute('aria-label', cardRetry ? '重试 ' + failed + ' 个词卡失败项' : reader?.isPdf ? '重试第 ' + pages.join('、') + ' 页' : '重试 ' + failed + ' 个翻译失败项');
+    retry.title = cardRetry ? '只重试未成功的词卡片段，保留原文' : reader?.isPdf ? '重试失败页中的未完成内容，复用已有译文' : '只重试未成功的翻译片段';
     const renderPages = reader?.pdfTranslation?.state.failedPages || [];
     pageStatus.textContent = pages.length ? '第 ' + pages.join('、') + ' 页未完成。'
       + (renderPages.length ? '其中第 ' + renderPages.join('、') + ' 页译文显示失败。' : '') + '可点击「重试失败页」，已有译文会保留。' : '';
@@ -252,7 +262,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     epoch++; revision++; running = false; enabled = false;
     restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); website = []; readerGroups = [];
     pdfGroups = []; reader?.pdfTranslation?.restore();
-    cache.clear(); failures.clear(); bubbleState.cards.clear(); bubbleState.closed.clear(); view = null; notes?.clear(); closeSelections();
+    cache.clear(); failures.clear(); cardCache.clear(); cardFailures.clear(); bubbleState.cards.clear(); bubbleState.closed.clear(); view = null; notes?.clear(); closeSelections();
     sync(); if (status) status.textContent = '页面或翻译设置已改变，请重新开始。';
   }
   function checkUrl() { if (url !== doc.location.href) { invalidate(); url = doc.location.href; } }
@@ -268,15 +278,16 @@ export function createFullTranslation({ doc = document, request = message => chr
       } catch { return true; }
     });
   }
-  async function translate(retryOnly = false) {
+  async function translate(retryOnly = false, cardsOnly = false) {
     if (!reader) return;
     ensureUI(); checkUrl(); if (running || savingPreferences) return;
-    if (retryOnly && !failedTexts().length && !failedPageNumbers().length) { sync(); return; }
+    if (cardsOnly && !selectionPrefs.bubbleCards) return;
+    if (retryOnly && !(cardsOnly ? failedCardTexts().length : failedTexts().length + failedPageNumbers().length)) { sync(); return; }
     closeSelections();
-    running = true; const token = ++epoch, version = revision, requestUrl = url; sync();
+    cardsOnlyRun = cardsOnly; running = true; const token = ++epoch, version = revision, requestUrl = url; sync();
     try {
       // A display failure already has translated text; no API or credentials are needed.
-      if (retryOnly && reader.isPdf && !failedTexts().length) {
+      if (!cardsOnly && retryOnly && reader.isPdf && !failedTexts().length) {
         message('正在重试失败页，复用已有译文…');
         await reader.pdfTranslation.retryFailedPages({ shouldContinue:() => token === epoch });
         if (token === epoch) message(failedPageNumbers().length ? '仍有页面显示失败，可再次重试；已有译文保留。' : '失败页已恢复，未重复请求翻译。');
@@ -294,10 +305,9 @@ export function createFullTranslation({ doc = document, request = message => chr
       if (token !== epoch) return;
       if (!reply?.ok) throw new Error(reply?.message || '无法读取翻译设置。');
       const provider = reply.config.provider;
-      if (provider === 'deepseek' && !reply.hasKey && !(reader.isPdf && pdfGroups.length && pdfGroups.every(group => !pdfAllowed(group)))) throw new Error('请填写 DeepSeek API Key，或切换到免费翻译。');
       activeProvider = provider;
       const nextSignature = JSON.stringify([reply.config.source, reply.config.target, reply.config.model, reply.config.stylePrompt]);
-      if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; void translate(); return; }
+      if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; void translate(false, cardsOnly); return; }
       signature = nextSignature; selectionPrefs = normalizeTranslation(reply.config);
       restoreTranslationGroups(website); website = reader.isPdf ? [] : collectTranslationGroups(doc.body, doc);
       if (!isReaderActive()) website = prioritizeWebsiteGroups(website, doc);
@@ -305,18 +315,24 @@ export function createFullTranslation({ doc = document, request = message => chr
         context: sampleContext(reader.isPdf ? pdfGroups.filter(pdfAllowed).map(group => group.source).join('\n\n') : isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n')) };
       if (reader) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); }
       const groups = reader.isPdf ? pdfGroups.filter(pdfAllowed) : isReaderActive() ? readerGroups : website;
-      const texts = [...new Set([...groups.flatMap(group => group.chunks), ...(retryOnly ? failedTexts(provider) : [])])];
+      syncBubbles();
+      if (provider === 'deepseek' && !reply.hasKey && groups.length) throw new Error('请填写 DeepSeek API Key，或切换到免费翻译。');
+      const retryTexts = cardsOnly ? failedCardTexts(provider) : failedTexts(provider);
+      const texts = [...new Set([...groups.flatMap(group => group.chunks), ...(retryOnly ? retryTexts : [])])];
       if (!texts.length) {
         if (reader.isPdf && reader.pdfTranslation?.state.originals.length) { view = null; message('所有可翻译文本框均已标记为原文，未发送翻译请求。'); return; }
         throw new Error('当前视图没有可翻译的文字。');
       }
-      enabled = true; apply(website, false); apply(readerGroups, true); applyPdf();
+      if (!cardsOnly) { enabled = true; apply(website, false); apply(readerGroups, true); applyPdf(); }
+      syncBubbles();
+      if (cardsOnly && provider !== 'deepseek') { message('已显示本地词卡。选用 DeepSeek 可从原文生成更多泡泡。'); return; }
       const wantsCards = provider === 'deepseek' && selectionPrefs.bubbleCards;
-      const pending = retryOnly ? failedTexts(provider) : texts.filter(text => {
-        const result = cache.get(cacheKey(text));
+      const resultsCache = cardsOnly ? cardCache : cache, runFailures = cardsOnly ? cardFailures : failures;
+      const pending = retryOnly ? retryTexts : texts.filter(text => {
+        const result = resultsCache.get(cacheKey(text));
         return !result || (wantsCards && (result.wordsLevel !== selectionPrefs.level || result.wordsExplanations !== selectionPrefs.explanations));
       });
-      let completed = texts.filter(text => cache.has(cacheKey(text))).length;
+      let completed = texts.filter(text => resultsCache.has(cacheKey(text))).length;
       let lastError = '';
       while (pending.length && token === epoch && doc.location.href === url) {
         // A mark made during translation takes effect before the next request; duplicates still translate where unmarked.
@@ -325,37 +341,39 @@ export function createFullTranslation({ doc = document, request = message => chr
         const batch = []; let length = 0;
         // Bubble mode combines up to four short runs into one request, with no queued next batch.
         while (pending.length && batch.length < (wantsCards ? 4 : 1) && length + pending[0].length <= 2000) { const text = pending.shift(); batch.push(text); length += text.length; }
-        message(`翻译中 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory 免费翻译' : 'DeepSeek'} · 可随时停止`);
+        message(`${cardsOnly ? '生成词卡中' : '翻译中'} ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory 免费翻译' : 'DeepSeek'} · 可随时停止`);
         let result;
-        try { result = await request({ type: 'ezr:translation:full', provider, texts: batch, view,
+        try { result = await request({ type: 'ezr:translation:full', provider, texts: batch, view, cardsOnly,
           ...(wantsCards ? { excludeTerms:[...bubbleState.closed].map(key => JSON.parse(key)[0]).slice(0, 80) } : {}) }); }
         catch (error) { result = { ok:false, message:error?.message || '无法连接翻译服务，请重试。' }; }
         // Successful late results may be cached, but only the current run owns failure/UI state.
         if (doc.location.href !== requestUrl || revision !== version || signature !== nextSignature) return;
         const accepted = new Map();
         for (const item of Array.isArray(result?.results) ? result.results : []) {
-          if (!batch.includes(item?.source) || typeof item.text !== 'string' || !item.text.trim()) continue;
+          if (!batch.includes(item?.source) || (cardsOnly ? !Array.isArray(item.words) : typeof item.text !== 'string' || !item.text.trim())) continue;
           accepted.set(item.source, item);
-          cache.set(cacheKey(item.source, provider), item);
+          if (!cardsOnly) cache.set(cacheKey(item.source, provider), item);
+          if (Array.isArray(item.words)) cardCache.set(cacheKey(item.source, provider), item);
         }
         if (token !== epoch) return;
         for (const source of batch) {
           const id = cacheKey(source, provider);
-          if (accepted.has(source)) failures.delete(id);
+          if (accepted.has(source)) { runFailures.delete(id); if (wantsCards) cardFailures.delete(id); }
           else {
-            lastError = result?.error || result?.message || '未收到有效译文，请重试。';
-            failures.set(id, { source, provider, message:lastError, cards:wantsCards, level:selectionPrefs.level, explanations:selectionPrefs.explanations });
+            lastError = result?.error || result?.message || (cardsOnly ? '未收到有效词卡，请重试。' : '未收到有效译文，请重试。');
+            runFailures.set(id, { source, provider, message:lastError, cards:wantsCards, level:selectionPrefs.level, explanations:selectionPrefs.explanations });
           }
         }
-        completed = texts.filter(text => textAllowed(text) && cache.has(cacheKey(text))).length;
-        apply(website, false); apply(readerGroups, true); applyPdf(); sync();
+        completed = texts.filter(text => textAllowed(text) && resultsCache.has(cacheKey(text))).length;
+        if (!cardsOnly) { apply(website, false); apply(readerGroups, true); applyPdf(); }
+        sync();
       }
       if (token === epoch) {
-        if (retryOnly && reader.isPdf) await reader.pdfTranslation.retryFailedPages({ shouldContinue:() => token === epoch });
+        if (!cardsOnly && retryOnly && reader.isPdf) await reader.pdfTranslation.retryFailedPages({ shouldContinue:() => token === epoch });
         if (token !== epoch) return;
-        const failed = failedTexts(provider).length;
-        const retryLabel = reader.isPdf ? '重试失败页' : '重试失败项';
-        message(`已翻译 ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'}${failed ? ' · ' + failed + ' 项失败，可点击「' + retryLabel + '」。' + (lastError ? ' ' + lastError : '') : ' · 切换视图复用结果'}`);
+        const failed = cardsOnly ? failedCardTexts(provider).length : failedTexts(provider).length;
+        const retryLabel = cardsOnly ? '重试失败词卡' : reader.isPdf ? '重试失败页' : '重试失败项';
+        message(`${cardsOnly ? '词卡已就绪' : '已翻译'} ${completed}/${texts.length} · ${provider === 'free' ? 'MyMemory' : 'DeepSeek'}${failed ? ' · ' + failed + ' 项失败，可点击「' + retryLabel + '」。' + (lastError ? ' ' + lastError : '') : ' · 切换视图复用结果'}`);
       }
     } catch (error) { if (token === epoch) message(error.message || '全文翻译失败，请重试。'); }
     finally { if (token === epoch) { running = false; sync(); } }
@@ -364,11 +382,12 @@ export function createFullTranslation({ doc = document, request = message => chr
     if (area !== 'local' || !changes[TRANSLATION_KEY]) return;
     const next = normalizeTranslation(changes[TRANSLATION_KEY].newValue);
     const changedCards = cardsChanged(selectionPrefs, next);
-    const continueTranslation = running && changedCards;
-    if (continueTranslation) { epoch++; running = false; }
+    const continueTranslation = running && !cardsOnlyRun && changedCards;
+    if (running && changedCards) { epoch++; running = false; }
     const nextSignature = JSON.stringify([next.source, next.target, next.model, next.stylePrompt]);
-    if (signature && signature !== nextSignature) { invalidate(); signature = nextSignature; }
-    if (activeProvider !== next.provider) {
+    const changedContext = signature && signature !== nextSignature, changedProvider = activeProvider !== next.provider;
+    if (changedContext) { invalidate(); signature = nextSignature; }
+    if (changedProvider) {
       epoch++; running = false; enabled = false;
       // Provider changes keep the captured selection text; restoring the view does not rewrite that snapshot.
       restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); notes?.clear();
@@ -379,7 +398,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     if (!next.wordCards || !next.enabled || next.level !== selectionPrefs.level || next.explanations !== selectionPrefs.explanations) notes?.clear();
     if (next.enabled !== selectionPrefs.enabled || next.bubbleCards !== selectionPrefs.bubbleCards) closeSelections();
     selectionPrefs = next; sync();
-    if (changedCards) refreshCards(continueTranslation);
+    if (changedCards || changedContext || changedProvider) refreshCards(continueTranslation);
   };
   chrome.storage.onChanged.addListener(storageChanged);
   // SPA navigation must also invalidate a stopped or fully translated view.
@@ -393,18 +412,18 @@ export function createFullTranslation({ doc = document, request = message => chr
     isTranslatedSelection(range) { checkUrl(); return isTranslatedSelection(range, website) || isTranslatedSelection(range, readerGroups); },
     addCards(cards, range) {
       for (const card of cards) if (!bubbleState.closed.has(bubbleKey(card))) bubbleState.cards.set(bubbleKey(card), card);
-      if (enabled && selectionPrefs.bubbleCards) { syncBubbles(); return true; }
+      if (selectionPrefs.bubbleCards) { syncBubbles(); return true; }
       return enabled && selectionPrefs.wordCards && selectionPrefs.enabled && notes ? notes.add(cards, range) : false;
     },
     beforeRead() { originalSuspended = true; closeSelections(); restoreTranslationGroups(website); syncBubbles(); },
     afterRead() { originalSuspended = false; if (enabled) apply(website, false); sync(); },
-    readerPaint() { notes?.clear(); if (reader && enabled) { readerGroups = collectReader(); apply(readerGroups, true); } syncBubbles(); },
+    readerPaint() { notes?.clear(); if (reader && (enabled || selectionPrefs.bubbleCards)) { readerGroups = collectReader(); apply(readerGroups, true); } syncBubbles(); },
     bindReader(value) {
       reader = value; const style = make('style', 'ezr-full-style'); style.textContent = CSS; reader.root.appendChild(style);
       unsubscribePdf?.(); unsubscribePdf = reader.pdfTranslation?.subscribe?.(sync);
       notes = createTranslationNotes({ ...value, doc, request });
       bubbles = createBubbleCards({ ...value, doc, request, state:bubbleState, getSources:bubbleSources });
-      readerGroups = enabled ? collectReader() : []; ensureUI(); apply(readerGroups, true); place();
+      readerGroups = collectReader(); ensureUI(); apply(readerGroups, true); place();
     },
     unbindReader() {
       epoch++; running = false; enabled = false; closeSelections();
@@ -420,7 +439,7 @@ export function createFullTranslation({ doc = document, request = message => chr
       applyPdf();
       if (isReaderActive()) {
         restoreTranslationGroups(website);
-        if (enabled) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); apply(readerGroups, true); }
+        if (enabled || selectionPrefs.bubbleCards) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); apply(readerGroups, true); }
       }
       else apply(website, false);
       place();

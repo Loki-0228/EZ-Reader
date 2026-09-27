@@ -1,5 +1,5 @@
 import { MAX_CONTEXT, MAX_SELECTION, normalizeTranslation, languageName, translationContextKey } from './config.js';
-import { ANALYZE_PROMPT, TRANSLATE_PROMPT, WORD_CARD_PROMPT, VOCABULARY_PROMPT, FULL_CARDS_PROMPT, normalizeSummary } from './prompts.js';
+import { ANALYZE_PROMPT, TRANSLATE_PROMPT, WORD_CARD_PROMPT, VOCABULARY_PROMPT, FULL_CARDS_PROMPT, BUBBLE_CARDS_PROMPT, normalizeSummary } from './prompts.js';
 import { isWordSelection, normalizeAiKnowledge } from './word-card.js';
 import { dictionaryEntry, wiktionaryEntries } from './dictionary.js';
 import { normalizeVocabulary } from './vocabulary.js';
@@ -239,6 +239,7 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
       || texts.join('').length > 2400) throw new Error('全文翻译批次过大，请重新开始。');
     const provider = input.provider || normalizeTranslation(rawConfig).provider;
     const settings = normalizeTranslation(rawConfig);
+    if (input.cardsOnly && (provider !== 'deepseek' || !settings.bubbleCards)) return { results:[], cached:true };
     // Full translation runs in every card mode; only the outer settings choose glossaries.
     const textSettings = { ...settings, enabled:true, bubbleCards:false };
     const fullInput = { ...input, slot: `${input.slot}/full`, text: texts[0], provider };
@@ -271,34 +272,38 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
   }
   async function fullWithCards(input, settings, apiKey, entry) {
     const config = normalizeTranslation(settings), texts = [...new Set(input.texts)];
-    const keyOf = text => JSON.stringify(['bubbles', config.level, config.explanations, text]);
+    const cardsOnly = input.cardsOnly === true;
+    const cardsKey = text => JSON.stringify(['bubbles-only', config.level, config.explanations, text]);
+    const keyOf = text => cardsOnly ? cardsKey(text) : JSON.stringify(['bubbles', config.level, config.explanations, text]);
     const plainKey = text => JSON.stringify(['deepseek', text]);
     const missing = texts.filter(text => !entry.fullCache.has(keyOf(text)));
     if (missing.length) {
       // Capture only earlier translations. Looking up the cache inside the queued job can
       // find a later plain-text job that is itself waiting for this batch to finish.
-      const previousTranslations = missing.map(text => entry.fullCache.get(plainKey(text)));
+      const previousTranslations = missing.map(text => !cardsOnly && entry.fullCache.get(plainKey(text)));
+      const previousCards = missing.map(text => !cardsOnly && entry.fullCache.get(cardsKey(text)));
       const batch = entry.fullQueue.then(async () => {
         ensure(entry);
         const segments = await Promise.all(missing.map(async (text, id) => ({ id, text,
-          existingTranslation: (await previousTranslations[id])?.text || '' })));
+          ...(!cardsOnly ? { existingTranslation:(await previousTranslations[id])?.text || '',
+            existingWords:(await Promise.resolve(previousCards[id]).catch(() => null))?.words || [] } : {}) })));
         const excluded = Array.isArray(input.excludeTerms) ? input.excludeTerms.filter(term => typeof term === 'string').slice(0, 80).map(term => term.slice(0, 64)) : [];
         // The translation and its small glossary share one request; no per-word call or separate summary.
         const raw = await deepseek([
-          { role:'system', content:withStyle(FULL_CARDS_PROMPT, config.stylePrompt) },
+          { role:'system', content:cardsOnly ? BUBBLE_CARDS_PROMPT : withStyle(FULL_CARDS_PROMPT, config.stylePrompt) },
           { role:'user', content:JSON.stringify({ title:String(input.view.title || '').slice(0, 300),
             context:input.view.context.slice(0, 1800), source:config.source, target:languageName(config.target),
             learnerLevel:config.level, includeExplanation:config.explanations, excludeTerms:excluded, segments }) },
-        ], config, apiKey, entry, true, 6000);
+        ], config, apiKey, entry, true, cardsOnly ? 3000 : 6000);
         let data;
-        try { data = JSON.parse(raw); } catch { throw new Error('全文译文与词卡格式无效，请重试失败项。'); }
-        if (!Array.isArray(data?.segments)) throw new Error('全文译文与词卡格式无效，请重试失败项。');
+        try { data = JSON.parse(raw); } catch { throw new Error('词卡响应格式无效，请重试失败项。'); }
+        if (!Array.isArray(data?.segments)) throw new Error('词卡响应格式无效，请重试失败项。');
         const seen = new Set();
         return segments.map(segment => {
           const matches = data.segments.filter(item => item?.id === segment.id);
           const item = matches.length === 1 ? matches[0] : null;
-          if (!item || typeof item.text !== 'string' || !item.text.trim() || item.text.length > 16000) return null;
-          const text = segment.existingTranslation || item.text.trim();
+          if (!item || (cardsOnly ? !Array.isArray(item.words) : typeof item.text !== 'string' || !item.text.trim() || item.text.length > 16000)) return null;
+          const text = cardsOnly ? '' : segment.existingTranslation || item.text.trim();
           let words = [];
           if (Array.isArray(item.words)) {
             words = normalizeVocabulary(JSON.stringify({ words:item.words }), segment.text, {
@@ -312,19 +317,29 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
               return { ...word, translatedTerm:typeof candidate === 'string' && candidate.trim().length <= 80 && text.includes(candidate.trim()) ? candidate.trim() : '' };
             });
           }
-          return { source:segment.text, text, provider:'deepseek', target:config.target,
+          return { source:segment.text, ...(!cardsOnly ? { text } : {}), provider:'deepseek', target:config.target,
             sourceLanguage:input.view.language || config.source, words, wordsLevel:config.level, wordsExplanations:config.explanations };
         });
       });
       missing.forEach((text, index) => {
         const job = batch.then(results => {
-          if (!results[index]) throw new Error('部分片段未返回完整译文，请重试失败项。');
-          entry.fullCache.set(plainKey(text), Promise.resolve(results[index]));
+          if (!results[index]) throw new Error(cardsOnly ? '部分片段未返回词卡，请重试失败项。' : '部分片段未返回完整译文，请重试失败项。');
+          if (!cardsOnly) {
+            entry.fullCache.set(plainKey(text), Promise.resolve(results[index]));
+            const { text:translation, ...cards } = results[index];
+            entry.fullCache.set(cardsKey(text), Promise.resolve(cards));
+          }
           return results[index];
         });
         entry.fullCache.set(keyOf(text), job);
         // Pure translation requests made while cards are in flight share the same result.
-        if (!entry.fullCache.has(plainKey(text))) entry.fullCache.set(plainKey(text), job);
+        if (!cardsOnly && !entry.fullCache.has(plainKey(text))) entry.fullCache.set(plainKey(text), job);
+        if (!cardsOnly && !entry.fullCache.has(cardsKey(text))) {
+          // Switching to the original view while translation is in flight shares its glossary.
+          const cardsJob = job.then(({ text:translation, ...cards }) => cards);
+          entry.fullCache.set(cardsKey(text), cardsJob);
+          void cardsJob.catch(() => { if (entry.fullCache.get(cardsKey(text)) === cardsJob) entry.fullCache.delete(cardsKey(text)); });
+        }
         void job.catch(() => {
           for (const key of [keyOf(text), plainKey(text)]) if (entry.fullCache.get(key) === job) entry.fullCache.delete(key);
         });
