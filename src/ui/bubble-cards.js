@@ -21,7 +21,7 @@ const CSS = `
 .ezr-bubbles{position:fixed;inset:0;pointer-events:none;z-index:60;color:var(--ezr-fg)}
 .ezr-bubbles [hidden]{display:none!important}
 .ezr-bubble-dot{position:fixed;width:24px;height:24px;padding:0;border:0;background:transparent;cursor:pointer;pointer-events:auto;border-radius:50%}
-.ezr-bubble-dot::before{content:'';display:block;margin:auto;width:8px;height:8px;border-radius:50%;background:#21804c;box-shadow:0 1px 3px #0003;outline:1px solid var(--ezr-bg)}
+.ezr-bubble-dot::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#21804c;opacity:.5}
 .ezr-bubble-dot[data-saved=true]::before{background:#ba8a08}
 .ezr-bubble-dot:hover::before,.ezr-bubble-dot[aria-expanded=true]::before{width:10px;height:10px}
 .ezr-bubbles :is(button,a):focus-visible{outline:2px solid var(--ezr-accent);outline-offset:2px}
@@ -38,7 +38,7 @@ const CSS = `
 .ezr-bubble-meta,.ezr-bubble-status{color:var(--ezr-muted);font-size:12px}
 .ezr-bubble-actions{margin-top:16px}
 .ezr-bubble-card a{color:var(--ezr-accent)}
-@media(forced-colors:active){.ezr-bubble-dot::before{background:ButtonText;outline:1px solid Canvas}.ezr-bubble-dot[data-saved=true]::before{border-radius:0}.ezr-bubble-card{border:1px solid CanvasText}}
+@media(forced-colors:active){.ezr-bubble-dot::before{background:ButtonText;outline:1px solid Canvas;opacity:1}.ezr-bubble-dot[data-saved=true]::before{border-radius:0}.ezr-bubble-card{border:1px solid CanvasText}}
 `;
 
 /** Page-local cards never issue translation requests. Only an explicit save writes the wordbook. */
@@ -49,6 +49,8 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   const panel = make('section', 'ezr-bubble-card'); panel.hidden = true; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '泡泡词卡');
   layer.appendChild(panel);
   const abort = new AbortController(), scroller = article.parentElement;
+  const measure = doc.createElement('canvas').getContext('2d'), metricsCache = new Map();
+  const segmenter = new Intl.Segmenter(undefined, { granularity:'grapheme' });
   let settings = { active:false }, saved = [], entries = [], opened = null, frame = 0, rebuild = false, destroyed = false, selectionTimer;
   function minimize(focus = false) {
     const previous = opened; opened = null; panel.hidden = true;
@@ -125,6 +127,38 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     }
     return null;
   }
+  function endGlyph(range) {
+    const glyph = range.cloneRange(), node = range.endContainer;
+    const last = [...segmenter.segment(node.data.slice(0, range.endOffset))].at(-1);
+    if (last) glyph.setStart(node, last.index);
+    return glyph;
+  }
+  function markerCorner(entry, rect) {
+    const glyph = entry.glyph, box = glyph.getBoundingClientRect();
+    const fallback = { right:rect.right, top:rect.top };
+    // Keep the visual right edge for RTL/mixed-direction and vertical runs.
+    if (!measure || !box.height || Math.abs(box.right - rect.right) > 1) return fallback;
+    const style = doc.defaultView.getComputedStyle(glyph.endContainer.parentElement);
+    if (!style.writingMode.startsWith('horizontal')) return fallback;
+    let text = glyph.toString();
+    if (style.textTransform === 'uppercase') text = text.toUpperCase();
+    else if (style.textTransform === 'lowercase') text = text.toLowerCase();
+    const font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const key = JSON.stringify([font, style.fontStretch, style.fontVariantCaps, text]);
+    let metrics = metricsCache.get(key);
+    if (!metrics) {
+      measure.font = font; measure.fontStretch = style.fontStretch; measure.fontVariantCaps = style.fontVariantCaps;
+      metrics = measure.measureText(text); metricsCache.set(key, metrics);
+      if (metricsCache.size > 256) metricsCache.delete(metricsCache.keys().next().value);
+    }
+    const fontHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+    const advance = metrics.width + (parseFloat(style.letterSpacing) || 0);
+    if (!(fontHeight > 0 && advance > 0 && metrics.actualBoundingBoxAscent > 0)) return fallback;
+    // Range rectangles include font padding and the final letter's spacing. Use the
+    // glyph's ink bounds instead, scaling them with the DOM for PDF/reader zoom.
+    return { right:box.left + metrics.actualBoundingBoxRight * box.width / advance,
+      top:box.top + (metrics.fontBoundingBoxAscent - metrics.actualBoundingBoxAscent) * box.height / fontHeight };
+  }
   function build() {
     const previousKey = opened?.id, hadFocus = panel.contains(root.getRootNode().activeElement);
     minimize(); entries.forEach(entry => entry.button.remove()); entries = [];
@@ -152,7 +186,7 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
         const range = rangeOf(nodes, match); if (!range) continue;
         occupied.add(match.index);
         const button = make('button', 'ezr-bubble-dot'); button.type = 'button'; button.setAttribute('aria-expanded', 'false'); button.dataset.term = card.term;
-        const entry = { id:`${index}:${key}`, card, range, button, saved:wordbook.has(key) };
+        const entry = { id:`${index}:${key}`, card, range, glyph:endGlyph(range), button, saved:wordbook.has(key) };
         updateDot(entry); button.addEventListener('click', event => { event.stopPropagation(); open(entry, event.detail === 0); });
         entries.push(entry); layer.insertBefore(button, panel);
         if (entry.id === previousKey) open(entry, hadFocus);
@@ -170,8 +204,9 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
       const visible = rect && rect.width > 0 && rect.height > 0 && rect.top >= viewport.top && rect.bottom <= viewport.bottom && rect.right > viewport.left && rect.left < viewport.right && entry.range.startContainer.isConnected;
       entry.button.hidden = !visible;
       if (visible) {
-        entry.button.style.left = `${Math.max(0, Math.min(rect.right - 7, doc.documentElement.clientWidth - 24))}px`;
-        entry.button.style.top = `${Math.max(viewport.top, rect.top - 14)}px`;
+        const corner = markerCorner(entry, rect);
+        entry.button.style.left = `${Math.max(0, Math.min(corner.right - 12, doc.documentElement.clientWidth - 24))}px`;
+        entry.button.style.top = `${Math.max(viewport.top, corner.top - 12)}px`;
       } else if (opened === entry) minimize();
     }
     position();
@@ -191,6 +226,7 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
   observe.observe(article, { childList:true, subtree:true, characterData:true });
   observe.observe(doc.body, { childList:true, subtree:true, characterData:true });
   const size = new ResizeObserver(() => schedule()); size.observe(scroller);
+  doc.fonts?.addEventListener('loadingdone', () => { metricsCache.clear(); schedule(); }, { signal:abort.signal });
   doc.addEventListener('scroll', () => schedule(), { capture:true, passive:true, signal:abort.signal });
   doc.defaultView.addEventListener('resize', () => schedule(), { signal:abort.signal });
   doc.addEventListener('pointerdown', event => { if (!event.composedPath().includes(layer)) minimize(); }, { capture:true, signal:abort.signal });
