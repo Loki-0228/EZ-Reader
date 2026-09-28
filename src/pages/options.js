@@ -25,6 +25,9 @@ const PERSIST_DEBOUNCE_MS = 250;
 /** How long the 「已保存」 pill stays on screen. */
 const SAVED_VISIBLE_MS = 1600;
 
+/** Fingerprint of the last dist/extension build applied by this extension. */
+const UPDATE_FINGERPRINT_KEY = 'ezr:build:fingerprint';
+
 /** Text used for the 首字母大写 demonstration. */
 const CASE_SAMPLE = 'an iPhone at the DNA lab costs 2024 dollars';
 
@@ -654,6 +657,135 @@ function bindStorageSync() {
   }
 }
 
+/**
+ * Read the build fingerprint written by tools/build.js.
+ * @returns {Promise<{version:string,fingerprint:string}>}
+ */
+async function readLocalBuildInfo() {
+  const url = `${chrome.runtime.getURL('build-info.json')}?check=${Date.now()}`;
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error('missing-build-info');
+  const info = await response.json();
+  if (typeof info?.fingerprint !== 'string' || !info.fingerprint) throw new Error('invalid-build-info');
+  return { version: typeof info.version === 'string' ? info.version : '', fingerprint: info.fingerprint };
+}
+
+/**
+ * Ask the installed native host to pull the Git source and build the local extension.
+ * @param {(message:string)=>void} onPhase progress callback
+ * @returns {Promise<{ok:boolean,message:string,version:string}>}
+ */
+function runLocalGitUpdate(onPhase) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let port;
+    try {
+      port = chrome.runtime.connectNative('com.ezreader.git_updater');
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    port.onMessage.addListener((message) => {
+      if (message?.type === 'phase') {
+        onPhase(typeof message.message === 'string' ? message.message : '正在更新…');
+        return;
+      }
+      if (message?.type !== 'result' || settled) return;
+      settled = true;
+      resolve({
+        ok: message.ok === true,
+        message: typeof message.message === 'string' ? message.message : '更新辅助程序未返回结果。',
+        version: typeof message.version === 'string' ? message.version : '',
+      });
+      try { port.disconnect(); } catch { /* 已结束 */ }
+    });
+    port.onDisconnect.addListener(() => {
+      if (settled) return;
+      settled = true;
+      const error = chrome.runtime.lastError;
+      reject(new Error(error?.message || 'native-host-disconnected'));
+    });
+    try {
+      port.postMessage({ action: 'update' });
+    } catch (error) {
+      settled = true;
+      reject(error);
+      try { port.disconnect(); } catch { /* 已结束 */ }
+    }
+  });
+}
+
+/**
+ * Connect the options page to the local Git updater and apply only after a second click.
+ * @returns {void}
+ */
+function bindUpdateCheck() {
+  const button = document.getElementById('check-update');
+  const status = document.getElementById('update-status');
+  const version = document.getElementById('update-version');
+  if (!button || !status) return;
+
+  const currentVersion = (() => {
+    try { return chrome.runtime.getManifest().version; } catch { return ''; }
+  })();
+  if (version) version.textContent = currentVersion ? `v${currentVersion}` : '';
+  status.textContent = currentVersion ? `当前扩展版本 v${currentVersion}` : '当前版本信息不可用';
+
+  let pendingFingerprint = '';
+  let pendingVersion = '';
+
+  button.addEventListener('click', async () => {
+    if (pendingFingerprint) {
+      status.textContent = '正在重载扩展并应用本地更新…';
+      button.disabled = true;
+      try {
+        await chrome.storage.local.set({ [UPDATE_FINGERPRINT_KEY]: pendingFingerprint });
+        chrome.runtime.reload();
+      } catch {
+        button.disabled = false;
+        status.textContent = '无法重载扩展，请重试。';
+      }
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = '正在连接…';
+    status.textContent = '正在连接本地 Git 更新辅助程序…';
+    try {
+      const before = await readLocalBuildInfo();
+      const saved = await chrome.storage.local.get(UPDATE_FINGERPRINT_KEY);
+      let appliedFingerprint = saved[UPDATE_FINGERPRINT_KEY];
+      if (typeof appliedFingerprint !== 'string') {
+        appliedFingerprint = before.fingerprint;
+        await chrome.storage.local.set({ [UPDATE_FINGERPRINT_KEY]: appliedFingerprint });
+      }
+
+      const result = await runLocalGitUpdate((message) => { status.textContent = message; });
+      if (!result.ok) {
+        status.textContent = result.message;
+      } else {
+        const after = await readLocalBuildInfo();
+        if (after.fingerprint === appliedFingerprint) {
+          status.textContent = `${result.message} dist/extension 无文件差异（v${after.version || currentVersion}）。`;
+        } else {
+          pendingFingerprint = after.fingerprint;
+          pendingVersion = after.version || result.version;
+          button.textContent = pendingVersion ? `重载应用 v${pendingVersion}` : '重载应用更新';
+          status.textContent = '检测到 dist/extension 文件差异。再次点击即可重载并应用更新。';
+        }
+      }
+    } catch (error) {
+      const message = String(error?.message || error);
+      status.textContent = message.includes('native') || message.toLowerCase().includes('host')
+        ? '本地更新辅助程序未安装或未授权。请先运行 tools/native-update/install.ps1。'
+        : '无法读取本地构建信息，请确认 Git 源码仓库和 dist/extension 已完成构建。';
+    } finally {
+      button.disabled = false;
+      if (!pendingFingerprint) button.textContent = '检测本地更新';
+    }
+  });
+}
+
 /* ------------------------------------------------------------------------ boot */
 
 /**
@@ -687,6 +819,7 @@ async function init() {
   buildFontOptions();
   bindControls();
   bindStorageSync();
+  bindUpdateCheck();
 
   applySettings(state.settings);
   render();

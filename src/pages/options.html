@@ -340,6 +340,15 @@
       <section class="card" aria-labelledby="sec-storage">
         <h2 id="sec-storage" class="card__title">存储</h2>
         <div class="row row--actions">
+          <span class="row__label">版本更新</span>
+          <div class="row__control">
+            <button id="check-update" class="button" type="button">检测本地更新</button>
+          </div>
+          <span id="update-version" class="row__value row__value--muted"></span>
+        </div>
+        <p id="update-status" class="note" role="status" aria-live="polite">读取本地 Git 仓库构建出的 dist/extension。</p>
+        <p class="note">点击后会在本地 Git 仓库检查并拉取更新，构建差异只同步到 dist/extension。检测到文件变化后，再次点击重载即可应用；源码仓库会保留。</p>
+        <div class="row row--actions">
           <span class="row__label">恢复默认</span>
           <div class="row__control">
             <button id="reset" class="button button--danger" type="button">恢复默认设置</button>

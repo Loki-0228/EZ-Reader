@@ -16,8 +16,9 @@
  * Usage: node tools/build.js
  */
 
-import { readFile, writeFile, mkdir, rm, readdir, copyFile, cp } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, copyFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,6 +27,71 @@ import { BuildError, buildGraph, emitBundle } from './bundler.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist', 'extension');
+
+/**
+ * Copy a generated file only when its bytes changed.
+ * @param {string} from source file
+ * @param {string} to destination file
+ * @returns {Promise<boolean>} whether the destination was written
+ */
+async function copyFileIfChanged(from, to) {
+  const sourceBytes = await readFile(from);
+  try {
+    if ((await readFile(to)).equals(sourceBytes)) return false;
+  } catch {
+    // New generated file.
+  }
+  await mkdir(path.dirname(to), { recursive: true });
+  await copyFile(from, to);
+  return true;
+}
+
+/**
+ * Merge a generated directory into dist without touching files outside the build output.
+ * Existing unrelated files are kept; generated files are written only when changed.
+ * @param {string} from source directory
+ * @param {string} to destination directory
+ * @returns {Promise<number>} number of files written
+ */
+async function copyDirectoryDiff(from, to) {
+  let changed = 0;
+  await mkdir(to, { recursive: true });
+  for (const entry of await readdir(from, { withFileTypes: true })) {
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    if (entry.isDirectory()) changed += await copyDirectoryDiff(sourcePath, targetPath);
+    else if (await copyFileIfChanged(sourcePath, targetPath)) changed += 1;
+  }
+  return changed;
+}
+
+/**
+ * Fingerprint generated extension files so the options page can detect an
+ * external Git/build update before the user reloads the unpacked extension.
+ * @param {string} root generated extension directory
+ * @returns {Promise<string>} stable SHA-256 fingerprint
+ */
+async function fingerprintExtension(root) {
+  const hash = createHash('sha256');
+  const visit = async (directory) => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const file = path.join(directory, entry.name);
+      const relative = path.relative(root, file).replaceAll(path.sep, '/');
+      if (relative === 'build-info.json') continue;
+      if (entry.isDirectory()) await visit(file);
+      else {
+        hash.update(relative);
+        hash.update('\0');
+        hash.update(await readFile(file));
+        hash.update('\0');
+      }
+    }
+  };
+  await visit(root);
+  return hash.digest('hex');
+}
 
 /** Directories whose `.js` files are bundled into the content script. */
 const MODULE_DIRS = ['core', 'dom', 'ui'];
@@ -111,12 +177,13 @@ function listModules() {
 
 async function copyStatic() {
   const skipped = [];
+  let changed = 0;
   for (const directory of ['documents', 'vendor/pdfjs']) {
-    await cp(path.join(SRC, directory), path.join(DIST, directory), { recursive:true });
+    changed += await copyDirectoryDiff(path.join(SRC, directory), path.join(DIST, directory));
   }
   await mkdir(path.join(DIST, 'translation'), { recursive: true });
   for (const name of await readdir(path.join(SRC, 'translation'))) {
-    if (name.endsWith('.js')) await copyFile(path.join(SRC, 'translation', name), path.join(DIST, 'translation', name));
+    if (name.endsWith('.js') && await copyFileIfChanged(path.join(SRC, 'translation', name), path.join(DIST, 'translation', name))) changed += 1;
   }
   for (const { from: relFrom, to: relTo } of STATIC_GLUE) {
     const from = path.join(ROOT, relFrom);
@@ -126,7 +193,7 @@ async function copyStatic() {
     }
     const to = path.join(DIST, relTo);
     await mkdir(path.dirname(to), { recursive: true });
-    await copyFile(from, to);
+    if (await copyFileIfChanged(from, to)) changed += 1;
   }
 
   // Extension pages are real ES modules importing `../core/*.js`, so the core modules
@@ -137,7 +204,7 @@ async function copyStatic() {
   const coreDir = path.join(SRC, 'core');
   if (existsSync(coreDir)) {
     for (const name of await readdir(coreDir)) {
-      if (name.endsWith('.js')) await copyFile(path.join(coreDir, name), path.join(coreOut, name));
+      if (name.endsWith('.js') && await copyFileIfChanged(path.join(coreDir, name), path.join(coreOut, name))) changed += 1;
     }
   }
 
@@ -150,10 +217,10 @@ async function copyStatic() {
     if (!existsSync(abs)) continue;
     for (const name of await readdir(abs)) {
       if (!name.endsWith('.js')) continue;
-      await copyFile(path.join(abs, name), path.join(referenceDir, `${dir}__${name}`));
+      if (await copyFileIfChanged(path.join(abs, name), path.join(referenceDir, `${dir}__${name}`))) changed += 1;
     }
   }
-  return skipped;
+  return { skipped, changed };
 }
 
 async function main() {
@@ -165,7 +232,6 @@ async function main() {
     return;
   }
 
-  await rm(DIST, { recursive: true, force: true });
   await mkdir(DIST, { recursive: true });
 
   const graph = buildGraph(ROOT, entries);
@@ -190,14 +256,23 @@ async function main() {
     return;
   }
 
-  await writeFile(path.join(DIST, 'content.js'), bundled, 'utf8');
-  await writeFile(
-    path.join(DIST, 'background.js'),
-    await readFile(path.join(ROOT, 'src/background.js'), 'utf8'),
-    'utf8',
-  );
+  let changed = 0;
+  const writeIfChanged = async (file, content) => {
+    const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+    try {
+      if ((await readFile(file)).equals(bytes)) return;
+    } catch {
+      // New generated file.
+    }
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, bytes);
+    changed += 1;
+  };
+  await writeIfChanged(path.join(DIST, 'content.js'), bundled);
+  await writeIfChanged(path.join(DIST, 'background.js'), await readFile(path.join(ROOT, 'src/background.js')));
 
-  const skipped = await copyStatic();
+  const { skipped, changed: copied } = await copyStatic();
+  changed += copied;
 
   const absent = REQUIRED_OUTPUT.filter((rel) => !existsSync(path.join(DIST, rel)));
   if (absent.length) {
@@ -208,11 +283,17 @@ async function main() {
     return;
   }
 
+  const manifest = JSON.parse(await readFile(path.join(DIST, 'manifest.json'), 'utf8'));
+  const fingerprint = await fingerprintExtension(DIST);
+  const buildInfo = JSON.stringify({ version: manifest.version, fingerprint });
+  await writeIfChanged(path.join(DIST, 'build-info.json'), buildInfo);
+
   const kb = (Buffer.byteLength(bundled, 'utf8') / 1024).toFixed(1);
   console.log(`[build] content.js   ${modules.length} modules, ${kb} KB`);
   for (const m of modules) console.log(`          · ${m}`);
   console.log('[build] background.js  (ES module service worker)');
   console.log('[build] pages/ + core/  (popup/options 及其 ESM 依赖)');
+  console.log(`[build] dist/extension 差异更新: ${changed} 个文件已写入；未改动和额外文件均保留`);
   if (skipped.length) console.log(`[build] 提示: 跳过缺失的源文件 ${skipped.join(', ')}`);
   console.log('[build] 输出目录: dist/extension');
   console.log('[build] 安装: Edge/Chrome 打开扩展管理页 → 开启开发者模式 → 加载解压缩的扩展 → 选 dist/extension');

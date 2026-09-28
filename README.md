@@ -55,7 +55,9 @@ node tools/build.js
 
 也可以下载仓库 ZIP，解压后在项目目录执行构建命令。`dist/` 由构建生成，不随源码提交。
 
-更新时执行 `git pull` 和 `node tools/build.js`，然后在扩展管理页重新加载扩展，并刷新已打开的网页。
+更新时可在设置页「存储 → 版本更新」点击「检测本地更新」。本地辅助程序会在源码仓库执行 fast-forward Git 更新并构建；构建只把变化文件同步到 `dist/extension`。发现文件差异后再次点击即可重载扩展，并刷新已打开的网页。
+
+首次使用前，在项目根目录运行 `tools/native-update/install.ps1`，按提示输入扩展 ID，以注册本地辅助程序。辅助程序要求 Git 工作区干净；如果有未提交改动，会停止更新以保护源码。也可以继续手动执行 `git pull`、`node tools/build.js`，然后在浏览器中重载扩展。
 
 ## PDF 与网页文档预览
 
