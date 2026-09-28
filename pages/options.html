@@ -343,17 +343,14 @@
           <span class="row__label">版本更新</span>
           <span class="row__value row__value--muted">结果显示在页面底部</span>
         </div>
-        <p class="note">点击页面底部的「检测更新」，本地更新程序会检查并拉取 Git 更新，再构建到 dist/extension。检测到文件变化后，再次点击即可重载应用。</p>
+        <p class="note">Git 安装并完成一次性授权后，点击页面底部的「检查并更新」即可拉取新版本并自动重载扩展。</p>
         <details class="note git-update-help">
-          <summary>直接使用 Git 安装或更新</summary>
-          <p>无需安装本地更新辅助程序。首次安装需要 Git、Node.js 24 和 Edge 或 Chrome 119 以上版本。</p>
-          <pre><code>git clone https://github.com/Loki-0228/EZ-Reader.git
-cd EZ-Reader
-node tools/build.js</code></pre>
-          <p>在扩展管理页加载项目中的 <code>dist/extension</code> 文件夹。以后在该项目目录运行：</p>
-          <pre><code>git pull --ff-only
-node tools/build.js</code></pre>
-          <p>构建完成后，在扩展管理页点击「重新加载」，再刷新已打开的网页。</p>
+          <summary>Git 安装与一键更新设置</summary>
+          <p>克隆 <code>release</code> 分支后即可直接加载，无需构建。Windows 自动更新只需首次设置一次。</p>
+          <pre><code>git clone --single-branch --branch release https://github.com/Loki-0228/EZ-Reader.git</code></pre>
+          <p>在 Edge 或 Chrome 扩展管理页开启开发者模式，点击「加载解压缩的扩展」，选择克隆后的 <code>EZ-Reader</code> 文件夹（里面直接有 <code>manifest.json</code>）。</p>
+          <p>Windows 用户复制扩展 ID，双击扩展文件夹中的 <code>native-update/install.cmd</code> 并粘贴 ID。完成后点击本页底部的「检查并更新」，即可自动同步并重载扩展。更新时需要联网并安装 Git。</p>
+          <p>如果仓库文件有手动改动，更新会先停止并提示处理改动。</p>
         </details>
         <p class="note">
           设置保存在浏览器扩展存储 <code>chrome.storage.local</code> 中：<code>ezr:settings:default</code>
@@ -371,10 +368,10 @@ node tools/build.js</code></pre>
       <div class="page__sticky-inner">
         <div class="page__sticky-status">
           <span id="update-version" class="row__value row__value--muted"></span>
-          <p id="update-status" class="note" role="status" aria-live="polite">读取本地 Git 仓库构建出的 dist/extension。</p>
+          <p id="update-status" class="note" role="status" aria-live="polite">Git 安装后，可在此同步并应用扩展更新。</p>
         </div>
         <div class="page__sticky-buttons">
-          <button id="check-update" class="button button--primary" type="button">检测更新</button>
+          <button id="check-update" class="button button--primary" type="button">检查并更新</button>
           <button id="reset" class="button button--danger" type="button">恢复默认</button>
         </div>
       </div>

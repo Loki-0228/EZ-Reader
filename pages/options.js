@@ -671,7 +671,7 @@ async function readLocalBuildInfo() {
 }
 
 /**
- * Ask the installed native host to pull the Git source and build the local extension.
+ * Ask the installed native host to pull the Git source, including its built extension bundle.
  * @param {(message:string)=>void} onPhase progress callback
  * @returns {Promise<{ok:boolean,message:string,version:string}>}
  */
@@ -716,7 +716,7 @@ function runLocalGitUpdate(onPhase) {
 }
 
 /**
- * Connect the options page to the local Git updater and apply only after a second click.
+ * Connect the options page to the local Git updater and reload automatically when files change.
  * @returns {void}
  */
 function bindUpdateCheck() {
@@ -731,26 +731,10 @@ function bindUpdateCheck() {
   if (version) version.textContent = currentVersion ? `v${currentVersion}` : '';
   status.textContent = currentVersion ? `当前扩展版本 v${currentVersion}` : '当前版本信息不可用';
 
-  let pendingFingerprint = '';
-  let pendingVersion = '';
-
   button.addEventListener('click', async () => {
-    if (pendingFingerprint) {
-      status.textContent = '正在重载扩展并应用本地更新…';
-      button.disabled = true;
-      try {
-        await chrome.storage.local.set({ [UPDATE_FINGERPRINT_KEY]: pendingFingerprint });
-        chrome.runtime.reload();
-      } catch {
-        button.disabled = false;
-        status.textContent = '无法重载扩展，请重试。';
-      }
-      return;
-    }
-
     button.disabled = true;
-    button.textContent = '正在连接…';
-    status.textContent = '正在连接本地 Git 更新辅助程序…';
+    button.textContent = '正在检查…';
+    status.textContent = '正在连接本地更新程序…';
     try {
       const before = await readLocalBuildInfo();
       const saved = await chrome.storage.local.get(UPDATE_FINGERPRINT_KEY);
@@ -766,22 +750,25 @@ function bindUpdateCheck() {
       } else {
         const after = await readLocalBuildInfo();
         if (after.fingerprint === appliedFingerprint) {
-          status.textContent = `${result.message} dist/extension 无文件差异（v${after.version || currentVersion}）。`;
+        status.textContent = `${result.message} 当前已是最新版本（v${after.version || currentVersion}）。`;
         } else {
-          pendingFingerprint = after.fingerprint;
-          pendingVersion = after.version || result.version;
-          button.textContent = pendingVersion ? `重载应用 v${pendingVersion}` : '重载应用更新';
-          status.textContent = '检测到 dist/extension 文件差异。再次点击即可重载并应用更新。';
+          const versionLabel = after.version || result.version;
+          status.textContent = versionLabel
+            ? `已更新到 v${versionLabel}，正在重载扩展…`
+            : '已获取更新，正在重载扩展…';
+          await chrome.storage.local.set({ [UPDATE_FINGERPRINT_KEY]: after.fingerprint });
+          await new Promise(resolve => setTimeout(resolve, 120));
+          chrome.runtime.reload();
         }
       }
     } catch (error) {
       const message = String(error?.message || error);
       status.textContent = message.includes('native') || message.toLowerCase().includes('host')
-        ? '本地更新程序未安装或未授权。可展开「直接使用 Git 安装或更新」查看手动步骤。'
-        : '无法读取本地构建信息，请确认 Git 源码仓库和 dist/extension 已完成构建。';
+        ? '自动更新尚未设置。请按下方说明从 Git 安装，并运行一次设置程序。'
+        : '无法读取版本信息，请确认已从 Git 安装 EZ-Reader。';
     } finally {
       button.disabled = false;
-      if (!pendingFingerprint) button.textContent = '检测更新';
+      button.textContent = '检查并更新';
     }
   });
 }
