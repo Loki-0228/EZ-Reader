@@ -6,7 +6,7 @@ import { setSettingsIcon } from './settings-icon.js';
 
 /** Selection UI belongs only to the reader's shadow tree. No remote text is parsed as HTML. */
 export function createTranslation({ root, article, getDocument, doc = document, request = message => chrome.runtime.sendMessage(message),
-  mode = 'reader', isActive = () => true, canSelect = () => true, getView = () => null, onCards = () => {} }) {
+  mode = 'reader', isActive = () => true, canSelect = () => true, getView = () => null, onCards = () => {}, onOpenSettings = () => {} }) {
   const abort = new AbortController();
   const shadow = root.getRootNode();
   let prefs = normalizeTranslation(), ready = false, selected = null, serial = 0, destroyed = false, viewId = crypto.randomUUID();
@@ -36,7 +36,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
   free.setAttribute('aria-pressed', 'true');
   deepseek.setAttribute('aria-pressed', 'false');
   const options = make('button', 'ezr-translation-options ezr-icon-button');
-  setSettingsIcon(options, '打开翻译设置', doc);
+  setSettingsIcon(options, '打开阅读与翻译设置', doc);
   actions.append(free, deepseek, options);
   const quick = make('div', 'ezr-translation-quick');
   const toggles = {};
@@ -397,7 +397,7 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     downloadWordCards(exportable(), 'anki', doc);
     detail.textContent = '在 Anki 中导入文件，选择双面（Basic）笔记类型。';
   });
-  options.addEventListener('click', () => { void request({ type: 'ezr:translation:options' }).catch(() => {}); });
+  options.addEventListener('click', () => { close(); onOpenSettings(); });
   panel.addEventListener('toggle', () => { if (selected && !panel.hidden) position(selected.rect); }, { capture: true, signal: abort.signal });
   article.addEventListener('pointerdown', event => { if (event.composedPath().includes(panel)) return; selecting = true; dismissed = ''; close(); dismissed = ''; }, { signal: abort.signal });
   doc.addEventListener('pointerup', () => { if (selecting) { selecting = false; clearTimeout(selectionTimer); selectionTimer = setTimeout(capture, 20); } }, { signal: abort.signal });

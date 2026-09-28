@@ -277,9 +277,10 @@ export function readerCss() {
 .ezr-title-chip { max-width:none; min-width:0; align-self:center; }
 .ezr-toolbar .ezr-reading-pdf .ezr-btn-original {border-right:0;border-radius:7px;}
 .ezr-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.615em; min-width:0; }
-.ezr-toolbar .ezr-btn-settings { margin-inline-start:auto; }
 .ezr-icon-button { display:inline-grid; place-items:center; width:2.462em; min-width:2.462em; height:2.308em; padding:0 !important; }
 .ezr-icon-button svg { width:1.25em; height:1.25em; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.ezr-toolbar .ezr-icon-button, .ezr-full-bar .ezr-icon-button, .ezr-translation .ezr-icon-button { border:0; background:transparent; color:var(--ezr-muted); border-radius:6px; }
+.ezr-toolbar .ezr-icon-button:hover, .ezr-full-bar .ezr-icon-button:hover, .ezr-translation .ezr-icon-button:hover { background:color-mix(in srgb,var(--ezr-fg) 7%,var(--ezr-bg)); color:var(--ezr-fg); }
 .ezr-toolbar .ezr-btn-translation[aria-expanded="true"], .ezr-full-bar .ezr-full-reader-tools[aria-expanded="true"] { color:var(--ezr-accent); border-color:var(--ezr-accent); background:color-mix(in srgb,var(--ezr-accent) 7%,var(--ezr-bg)); }
 /* The dock toggle and the close icon are frameless icon buttons; only their hover tint draws anything. */
 .ezr-toolbar .ezr-toolbar-close, .ezr-full-bar .ezr-toolbar-close,

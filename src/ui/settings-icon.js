@@ -7,13 +7,13 @@ export function setSettingsIcon(button, label = '设置', doc = button.ownerDocu
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
-  const spokes = doc.createElementNS(svg.namespaceURI, 'path');
-  spokes.setAttribute('d', 'M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.28 5.28l2.12 2.12m9.2 9.2 2.12 2.12m0-13.44-2.12 2.12m-9.2 9.2-2.12 2.12');
+  const gear = doc.createElementNS(svg.namespaceURI, 'path');
+  gear.setAttribute('d', 'M9.8 2.8h4.4l.52 2.18c.58.18 1.1.48 1.57.86l2.16-.62 2.2 3.82-1.62 1.56c.08.64.08 1.28 0 1.92l1.62 1.56-2.2 3.82-2.16-.62c-.47.38-.99.68-1.57.86l-.52 2.18H9.8l-.52-2.18a6.6 6.6 0 0 1-1.57-.86l-2.16.62-2.2-3.82 1.62-1.56a7.7 7.7 0 0 1 0-1.92L3.35 9.04l2.2-3.82 2.16.62c.47-.38.99-.68 1.57-.86L9.8 2.8z');
   const hub = doc.createElementNS(svg.namespaceURI, 'circle');
   hub.setAttribute('cx', '12'); hub.setAttribute('cy', '12'); hub.setAttribute('r', '6.25');
   const center = doc.createElementNS(svg.namespaceURI, 'circle');
   center.setAttribute('cx', '12'); center.setAttribute('cy', '12'); center.setAttribute('r', '2.1');
-  svg.append(spokes, hub, center);
+  svg.append(gear, hub, center);
   button.appendChild(svg);
   return button;
 }

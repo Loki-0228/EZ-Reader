@@ -125,10 +125,10 @@ export function createFullTranslation({ doc = document, request = message => chr
     levelInput = make('select', 'ezr-full-level'); levelInput.setAttribute('aria-label', '生词卡英语水平');
     for (const [value, label] of ENGLISH_LEVELS) { const option = make('option', '', label); option.value = value; levelInput.appendChild(option); }
     levelInput.value = selectionPrefs.level;
-    const settings = make('button', 'ezr-full-settings ezr-icon-button'); setSettingsIcon(settings, '打开翻译设置', doc);
+    const settings = make('button', 'ezr-full-settings ezr-icon-button'); setSettingsIcon(settings, '打开阅读与翻译设置', doc);
     const close = make('button', 'ezr-full-close ezr-toolbar-close', ''); close.setAttribute('aria-label', '关闭翻译工具栏'); close.title = '关闭翻译工具栏'; close.appendChild(closeIcon(doc));
     modeControl = createTranslationMode({ doc, className:'ezr-full-mode', onChange:patch => { void preferences(patch); } });
-    const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(modeControl.element, settings);
+    const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(modeControl.element);
     status = make('span', 'ezr-full-status', ''); status.setAttribute('aria-live', 'polite');
     pageStatus = make('span', 'ezr-full-status ezr-full-page-status', ''); pageStatus.setAttribute('aria-live', 'polite');
     readerTools = make('button', 'ezr-full-reader-tools', '阅读工具');
@@ -139,7 +139,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     dockButton = make('button', 'ezr-full-dock ezr-toolbar-dock');
     dockButton.addEventListener('click', () => reader?.setTranslationDock?.(reader?.getTranslationDock?.() === 'bottom' ? 'top' : 'bottom'));
     const end = make('div', 'ezr-toolbar-end ezr-full-end');
-    end.append(readerTools, dockButton, close);
+    end.append(readerTools, settings, dockButton, close);
     const caption = make('span', 'ezr-full-caption', '翻译');
     const controls = make('div', 'ezr-full-controls');
     controls.append(providerInput, targetLabel, start, stop, retry, inputText, bilingualLabel, cardsLabel, levelInput, preferencesGroup);
@@ -174,10 +174,10 @@ export function createFullTranslation({ doc = document, request = message => chr
     levelInput.addEventListener('change', () => { void preferences({ level: levelInput.value }); });
     providerInput.addEventListener('change', () => { void preferences({ provider: providerInput.value }); });
     targetInput.addEventListener('change', () => { void preferences({ target:targetInput.value }); });
-    settings.addEventListener('click', () => { void request({ type: 'ezr:translation:options' }); });
+    settings.addEventListener('click', () => reader?.openSettings?.());
     close.addEventListener('click', () => setToolbarVisible(false, true));
     originalRoot = make('div', 'ezr-original-selection'); reader.root.appendChild(originalRoot);
-    originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original',
+    originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original', onOpenSettings:() => reader?.openSettings?.(),
       isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: () => view,
       getDocument: () => ({ title: doc.title, blocks: [] }) });
     void request({ type: 'ezr:translation:config' }).then(result => { if (result?.ok) { selectionPrefs = normalizeTranslation(result.config); sync(); refreshCards(); } }).catch(() => {});

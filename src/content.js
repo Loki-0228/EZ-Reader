@@ -330,9 +330,14 @@ function bootstrap() {
     });
 
     const abort = new AbortController();
+    const openSettings = () => {
+      translation.close();
+      fullTranslation.closeSelection();
+      settingsPanel.open();
+    };
     const translation = createTranslation({ root: shell.root, article: shell.article, getDocument: () => currentDoc, doc,
       canSelect: range => !fullTranslation.isTranslatedSelection(range), getView: () => fullTranslation.getView(),
-      onCards: (cards, range) => fullTranslation.addCards(cards, range) });
+      onCards: (cards, range) => fullTranslation.addCards(cards, range), onOpenSettings:openSettings });
 
     // Free-form translation works in both views: it never depends on the article.
     const textTranslation = createTextTranslation({ root: shell.root, doc });
@@ -378,9 +383,7 @@ function bootstrap() {
       onOpenOriginal: () => setPreviewing(!previewing),
       onFullTranslation: () => fullTranslation.show(),
       onOpenSettings: () => {
-        translation.close();
-        fullTranslation.closeSelection();
-        settingsPanel.toggle();
+        openSettings();
       },
       onClose: () => closeWindowTools(),
       onFontQuick: (fontId) => settingsStore.update({ fontId }),
@@ -464,7 +467,7 @@ function bootstrap() {
     paint(currentDoc, settings);
     toolbar.setPreviewing(previewing);
     originalCapitalization.setEnabled(!isDocumentReader && (previewing && settings.capitalizeFirst));
-    fullTranslation.bindReader({ root: shell.root, toolbarHost:shell.toolbarHost, translationToolbarHost:shell.translationToolbarHost, isPdf:isDocumentReader, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close(),
+    fullTranslation.bindReader({ root: shell.root, toolbarHost:shell.toolbarHost, translationToolbarHost:shell.translationToolbarHost, isPdf:isDocumentReader, article: shell.article, getDocument: () => currentDoc, closeSelection: () => translation.close(), openSettings,
       openTextTranslation: () => { translation.close(); fullTranslation.closeSelection(); settingsPanel.close(); textTranslation.toggle(); },
       onTranslationVisibility: value => toolbar.setTranslationOpen(value),
       isMainToolbarVisible: () => !toolbar.element.hidden,

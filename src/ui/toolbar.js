@@ -132,7 +132,6 @@ export function createToolbar(container, opts = {}) {
   const pickBtn = makeButton('选择区域', '在原网页选择要阅读的区域', () => fire(opts.onPickRegion), 'ezr-btn-pick');
   const settingsButton = makeButton('', '打开设置', () => fire(opts.onOpenSettings), 'ezr-btn-settings ezr-icon-button');
   setSettingsIcon(settingsButton, '打开阅读与翻译设置', doc);
-  bar.appendChild(settingsButton);
   const translationBtn = makeButton('翻译工具', '显示翻译工具栏', () => fire(opts.onFullTranslation), 'ezr-btn-translation');
   translationBtn.setAttribute('aria-expanded', 'false');
   translationBtn.setAttribute('aria-controls', 'ezr-translation-bar');
@@ -154,7 +153,7 @@ export function createToolbar(container, opts = {}) {
   dockBtn.dataset.target = 'bottom';
   dockBtn.appendChild(dockIcon(doc, 'bottom'));
   const end = doc.createElement('div'); end.className = 'ezr-toolbar-end';
-  end.append(translationBtn, dockBtn, close);
+  end.append(translationBtn, settingsButton, dockBtn, close);
 
   bar.insertBefore(readingGroup, zoomGroup);
 
