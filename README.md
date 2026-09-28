@@ -41,32 +41,29 @@ EZ-Reader 是一个面向 Edge / Chrome 的 Manifest V3 浏览器扩展。它将
 
 发布页同时提供 `SHA256SUMS.txt`，可用于校验 ZIP 下载是否完整。更新时将新版本解压到原安装目录，在扩展管理页重新加载扩展，并刷新网页。
 
-### Git 安装（持续更新推荐）
+### Git 安装（一键更新推荐）
 
-准备 **Node.js 24** 和 Chromium 119 或更新版本的 Edge / Chrome。项目无需安装 npm 依赖。
-
-```bash
-git clone https://github.com/Loki-0228/EZ-Reader.git
-cd EZ-Reader
-node tools/build.js
-```
-
-构建完成后，按上面的加载步骤选择项目中的 **`dist/extension`** 文件夹。该构建目录随 Git 仓库提交，后续 `git pull` 会同时获取源码和可直接加载的扩展。
-
-这套 Git 安装方式不需要注册本地更新辅助程序，也不需要给浏览器配置 Git 访问权限。以后在项目目录更新并重新构建：
+需要 Git 和 Chromium 119 或更新版本的 Edge / Chrome。`release` 分支已包含可直接加载的扩展文件，无需安装 Node.js 或构建。
 
 ```bash
-git pull --ff-only
-node tools/build.js
+git clone --single-branch --branch release https://github.com/Loki-0228/EZ-Reader.git
 ```
 
-然后在 Edge 或 Chrome 的扩展管理页点击「重新加载」，并刷新已打开的网页。
+在 Edge 或 Chrome 扩展管理页开启开发者模式，点击「加载解压缩的扩展」，选择克隆后的 **`EZ-Reader`** 文件夹（其中直接包含 `manifest.json`）。
 
-也可以下载仓库 ZIP，解压后在项目目录执行构建命令。Git 仓库只跟踪 `dist/extension`；`dist/` 中的本地发布压缩包和临时文件不会提交。
+Windows 用户要使用设置页中的「检查并更新」，首次安装时在扩展管理页复制 EZ-Reader 的扩展 ID，然后双击扩展文件夹中的 `native-update/install.cmd`，按提示粘贴 ID。此步骤只需执行一次。浏览器扩展不能直接启动本机命令，因此需要注册一次更新辅助程序。
 
-安装本地更新程序后，可在设置页底部点击「检测更新」。辅助程序会在源码仓库执行 fast-forward Git 更新并构建；构建只把变化文件同步到 `dist/extension`。发现文件差异后，再次点击即可重载扩展并刷新已打开的网页。
+设置完成后，每次点击「检查并更新」，扩展会同步 `release` 分支并自动重载。无需手动输入 Git 命令、安装 Node.js 或重新构建。仓库文件存在手动改动时，更新会停止并提示先处理改动。
 
-如果要在设置页点击「检测更新」自动拉取并构建，可在项目根目录运行 `tools/native-update/install.ps1`，按提示输入扩展 ID 注册本地辅助程序。辅助程序要求 Git 工作区干净；存在未提交改动时会停止更新。也可以始终按上面的 Git 命令手动更新，无需安装辅助程序。
+不使用本地更新辅助程序时，可在仓库目录运行 `git pull --ff-only`，再到扩展管理页点击「重新加载」。
+
+### 下载源码压缩包
+
+也可以下载 [release 分支 ZIP](https://github.com/Loki-0228/EZ-Reader/archive/refs/heads/release.zip)，解压后加载其中的 `EZ-Reader-release` 文件夹。该方式不包含 `.git` 元数据，不能使用设置页自动更新。
+
+### 从源码构建
+
+开发项目需要 **Node.js 24**。在仓库根目录运行 `node tools/build.js`，再加载 `dist/extension`。
 
 ## PDF 与网页文档预览
 

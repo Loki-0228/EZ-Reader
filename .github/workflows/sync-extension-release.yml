@@ -1,0 +1,49 @@
+name: Sync prebuilt extension release branch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - dist/extension/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Save built extension
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP 'ez-reader-extension'
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+          Get-ChildItem -Force -LiteralPath 'dist/extension' |
+            Copy-Item -Destination $bundle -Recurse -Force
+          "BUNDLE_PATH=$bundle" >> $env:GITHUB_ENV
+
+      - name: Replace release branch contents with the built extension
+        shell: pwsh
+        run: |
+          git switch --force-create release origin/release
+          Get-ChildItem -Force -LiteralPath '.' |
+            Where-Object { $_.Name -ne '.git' } |
+            Remove-Item -Recurse -Force
+          Get-ChildItem -Force -LiteralPath $env:BUNDLE_PATH |
+            Copy-Item -Destination '.' -Recurse -Force
+          git add -A
+          if (git diff --cached --quiet) {
+            Write-Host 'The release branch already matches dist/extension.'
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Sync prebuilt extension from main $($env:GITHUB_SHA.Substring(0, 7))"
+          git push origin release

@@ -196,6 +196,13 @@ async function copyStatic() {
     if (await copyFileIfChanged(from, to)) changed += 1;
   }
 
+  // Keep the one-time Git updater installer beside the ready-to-load extension.
+  // This makes its files available on both the main build and the root-level release branch.
+  for (const name of ['NativeUpdateHost.cs', 'install.ps1', 'install.cmd']) {
+    const from = path.join(ROOT, 'tools', 'native-update', name);
+    if (await copyFileIfChanged(from, path.join(DIST, 'native-update', name))) changed += 1;
+  }
+
   // Extension pages are real ES modules importing `../core/*.js`, so the core modules
   // are copied to dist/extension/core/ to keep the specifiers identical in the source
   // tree and in the build.
