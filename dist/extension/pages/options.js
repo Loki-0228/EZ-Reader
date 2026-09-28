@@ -750,7 +750,7 @@ function bindUpdateCheck() {
       } else {
         const after = await readLocalBuildInfo();
         if (after.fingerprint === appliedFingerprint) {
-        status.textContent = `${result.message} 当前已是最新版本（v${after.version || currentVersion}）。`;
+          status.textContent = `${result.message} 当前已是最新版本（v${after.version || currentVersion}）。`;
         } else {
           const versionLabel = after.version || result.version;
           status.textContent = versionLabel
