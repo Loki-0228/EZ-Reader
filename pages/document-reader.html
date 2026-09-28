@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDF 阅读 · EZ-Reader</title>
+  <link rel="stylesheet" href="../vendor/pdfjs/pdf_viewer.css">
+  <link rel="stylesheet" href="document-reader.css">
+</head>
+<body>
+  <nav id="pdf-navigation" data-ezr-ui aria-label="PDF 控制">
+    <label class="pdf-file-button">打开文件<input id="pdf-file" type="file" accept=".pdf,application/pdf"></label>
+    <label>页码 <input id="pdf-page" type="number" value="1" min="1" aria-label="PDF 页码"><span id="pdf-total"></span></label>
+    <button id="pdf-fit" type="button" aria-pressed="true">适应宽度</button>
+    <button id="pdf-fit-height" type="button" aria-pressed="false">适应高度</button>
+    <button id="pdf-export" type="button" disabled title="翻译后导出 PDF">导出 PDF</button>
+    <button id="pdf-batch-edit" type="button" hidden aria-pressed="false" aria-controls="pdf-edit-controls">批量编辑</button>
+    <span id="pdf-translation-count" role="status" aria-live="polite"></span>
+    <button id="open-toolbar" type="button">工具栏</button>
+    <button id="cancel-load" type="button" hidden>停止打开</button>
+    <form id="source-form" hidden><label for="pdf-source">页面中的 PDF</label><select id="pdf-source"></select><button type="submit">打开 PDF</button></form>
+    <div id="pdf-edit-controls" role="group" aria-label="PDF 文本框批量编辑" hidden>
+      <span id="pdf-edit-count" role="status" aria-live="polite">已选 0 个文本框</span>
+      <button id="pdf-edit-original" type="button" disabled title="保留原 PDF 字形和排版，全文翻译跳过所选文本框">标记为原文</button>
+      <button id="pdf-edit-unmark" type="button" disabled title="取消保护，有缓存时恢复译文，未翻译内容在下次全文翻译时处理">取消原文标记</button>
+      <label>字号 <input id="pdf-edit-font-size" type="number" min="1" max="144" step="0.1" aria-label="所选译文文本框字号">pt</label>
+      <button id="pdf-edit-size-drag" type="button" disabled title="按住上下拖动调整字号；方向键微调，Shift 加速" aria-label="上下拖动调整所选译文字号">拖动调字号</button>
+      <label>水平 <select id="pdf-edit-horizontal" disabled aria-label="文本框水平对齐"><option value="" hidden>多种对齐</option><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option></select></label>
+      <label>垂直 <select id="pdf-edit-vertical" disabled aria-label="文本框垂直对齐"><option value="" hidden>多种对齐</option><option value="top">上对齐</option><option value="middle">居中</option><option value="bottom">下对齐</option></select></label>
+      <button id="pdf-edit-reset" type="button" disabled>恢复自动字号</button>
+      <button id="pdf-edit-clear" type="button" disabled>清空选择</button>
+      <button id="pdf-edit-done" type="button">完成</button>
+      <span id="pdf-edit-hint" role="status" aria-live="polite">点击单选，拖动框选；Ctrl / Shift 点击可增减选择。Esc 退出。</span>
+    </div>
+  </nav>
+  <p id="pdf-status" data-ezr-ui role="status" aria-live="polite" hidden></p>
+  <div id="pdf-container" tabindex="0" aria-label="PDF 原文"><div id="pdf-pages" class="pdfViewer"></div></div>
+  <script src="../content.js"></script>
+  <script type="module" src="document-reader.js"></script>
+</body>
+</html>
