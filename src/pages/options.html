@@ -341,20 +341,20 @@
         <h2 id="sec-storage" class="card__title">存储</h2>
         <div class="row row--actions">
           <span class="row__label">版本更新</span>
-          <div class="row__control">
-            <button id="check-update" class="button" type="button">检测本地更新</button>
-          </div>
-          <span id="update-version" class="row__value row__value--muted"></span>
+          <span class="row__value row__value--muted">结果显示在页面底部</span>
         </div>
-        <p id="update-status" class="note" role="status" aria-live="polite">读取本地 Git 仓库构建出的 dist/extension。</p>
-        <p class="note">点击后会在本地 Git 仓库检查并拉取更新，构建差异只同步到 dist/extension。检测到文件变化后，再次点击重载即可应用；源码仓库会保留。</p>
-        <div class="row row--actions">
-          <span class="row__label">恢复默认</span>
-          <div class="row__control">
-            <button id="reset" class="button button--danger" type="button">恢复默认设置</button>
-          </div>
-          <span class="row__value row__value--muted"></span>
-        </div>
+        <p class="note">点击页面底部的「检测更新」，本地更新程序会检查并拉取 Git 更新，再构建到 dist/extension。检测到文件变化后，再次点击即可重载应用。</p>
+        <details class="note git-update-help">
+          <summary>直接使用 Git 安装或更新</summary>
+          <p>无需安装本地更新辅助程序。首次安装需要 Git、Node.js 24 和 Edge 或 Chrome 119 以上版本。</p>
+          <pre><code>git clone https://github.com/Loki-0228/EZ-Reader.git
+cd EZ-Reader
+node tools/build.js</code></pre>
+          <p>在扩展管理页加载项目中的 <code>dist/extension</code> 文件夹。以后在该项目目录运行：</p>
+          <pre><code>git pull --ff-only
+node tools/build.js</code></pre>
+          <p>构建完成后，在扩展管理页点击「重新加载」，再刷新已打开的网页。</p>
+        </details>
         <p class="note">
           设置保存在浏览器扩展存储 <code>chrome.storage.local</code> 中：<code>ezr:settings:default</code>
           保存全局默认值，<code>ezr:settings:byOrigin</code> 保存「按站点分别记忆」产生的站点覆盖项，阅读位置保存在
@@ -365,6 +365,19 @@
       <footer class="page__foot">
         <p class="note">EZ-Reader · 本地阅读与系统字体 · 联网翻译由用户主动触发</p>
       </footer>
+    </div>
+
+    <div class="page__sticky-actions" role="group" aria-label="常驻设置操作">
+      <div class="page__sticky-inner">
+        <div class="page__sticky-status">
+          <span id="update-version" class="row__value row__value--muted"></span>
+          <p id="update-status" class="note" role="status" aria-live="polite">读取本地 Git 仓库构建出的 dist/extension。</p>
+        </div>
+        <div class="page__sticky-buttons">
+          <button id="check-update" class="button button--primary" type="button">检测更新</button>
+          <button id="reset" class="button button--danger" type="button">恢复默认</button>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="options.js"></script>

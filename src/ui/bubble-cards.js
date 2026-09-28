@@ -26,6 +26,8 @@ const CSS = `
 .ezr-bubble-dot:hover::before,.ezr-bubble-dot[aria-expanded=true]::before{width:10px;height:10px}
 .ezr-bubbles :is(button,a):focus-visible{outline:2px solid var(--ezr-accent);outline-offset:2px}
 .ezr-bubble-card{position:fixed;box-sizing:border-box;pointer-events:auto;background:var(--ezr-bg);color:var(--ezr-fg);border-radius:12px;padding:18px;box-shadow:0 6px 24px #0003;font:14px/1.6 'Segoe UI','Microsoft YaHei',sans-serif;overflow:auto;overflow-wrap:anywhere;text-transform:none;user-select:text}
+.ezr-bubble-glint{position:relative;flex:none;width:16px;height:16px;margin:2px 1px 0;background:linear-gradient(135deg,#fff8c9 0 30%,#ffd451 31% 100%);clip-path:polygon(50% 0,61% 36%,100% 50%,61% 64%,50% 100%,39% 64%,0 50%,39% 36%);filter:drop-shadow(0 1px 2px #d99c2877)}
+.ezr-bubble-glint::after{content:'';position:absolute;top:0;right:0;width:5px;height:5px;border-radius:50%;background:#fff}
 .ezr-bubble-head,.ezr-bubble-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ezr-bubble-head{flex-wrap:nowrap;align-items:start}
 .ezr-bubble-head strong{font-size:22px;line-height:1.3;flex:1;min-width:0}
@@ -111,7 +113,8 @@ export function createBubbleCards({ root, article, doc, request, state, getSourc
     const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
     const line = doc.createElementNS(svg.namespaceURI, 'path'); line.setAttribute('d', 'M5 12h14'); line.setAttribute('stroke', 'currentColor'); line.setAttribute('stroke-width', '2'); svg.append(line); min.append(svg);
     close.setAttribute('aria-label', '关闭此词卡，本篇不再显示'); close.title = '关闭此词卡，本篇不再显示'; close.append(closeIcon(doc));
-    head.append(make('strong', '', card.term), min, close); panel.append(head);
+    const glint = make('span', 'ezr-bubble-glint'); glint.setAttribute('aria-hidden', 'true');
+    head.append(make('strong', '', card.term), glint, min, close); panel.append(head);
     panel.append(make('p', 'ezr-bubble-meta', [card.phonetic, card.partOfSpeech].filter(Boolean).join(' · ')), make('p', 'ezr-bubble-translation', card.translation));
     for (const text of [card.meaning !== card.translation ? card.meaning : '', card.usage, card.example, card.exampleTranslation]) if (text) panel.append(make('p', '', text));
     const info = make('p', 'ezr-bubble-status', entry.saved ? '已在生词本 · 黄点' : '本篇已缓存 · 绿点'); info.setAttribute('role', 'status');

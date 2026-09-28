@@ -134,7 +134,6 @@ export function createSettingsPanel(container, opts = {}) {
   // 头部
   const head = make('div', 'ezr-settings-head');
   const heading = make('div', 'ezr-settings-heading');
-  heading.appendChild(make('span', 'ezr-settings-kicker', 'EZ-READER'));
   heading.appendChild(make('h2', 'ezr-settings-title', '设置'));
   const description = make('p', 'ezr-settings-description', '让文字适合你的阅读节奏。');
   heading.appendChild(description);
@@ -152,10 +151,9 @@ export function createSettingsPanel(container, opts = {}) {
 
   const scroll = make('div', 'ezr-settings-scroll');
   panel.appendChild(scroll);
-  const section = (number, title) => {
+  const section = (title) => {
     const group = make('section', 'ezr-settings-section');
     const label = make('h3', 'ezr-settings-section-title');
-    label.appendChild(make('span', 'ezr-section-number', number));
     label.appendChild(make('span', '', title));
     group.appendChild(label);
     scroll.appendChild(group);
@@ -271,7 +269,7 @@ export function createSettingsPanel(container, opts = {}) {
   };
 
   // 排版
-  const typography = section('01', '字体与排版');
+  const typography = section('字体与排版');
   typography.appendChild(selectRow({
     key: 'fontId',
     label: '字体',
@@ -324,12 +322,12 @@ export function createSettingsPanel(container, opts = {}) {
   }));
 
   // 内容
-  const content = section('02', '内容处理');
+  const content = section('内容处理');
   content.appendChild(checkRow({ key: 'splitLines', label: '自动拆分长段', description: '将挤在一起的文本分成清晰段落' }));
   content.appendChild(selectRow({ key: 'headingMode', label: '标题识别', options: HEADING_MODES }));
 
   // 视图
-  const display = section('03', '显示');
+  const display = section('显示');
   display.appendChild(rangeRow({ key:'toolFontScale', label:'工具字体缩放',
     min:SETTING_LIMITS.toolFontScale.min, max:SETTING_LIMITS.toolFontScale.max, step:.05,
     format:v => `${Math.round(v * 100)}%` }));
@@ -361,7 +359,7 @@ export function createSettingsPanel(container, opts = {}) {
   display.appendChild(checkRow({ key: 'capitalizeFirst', label: '单词首字母大写', description: '两种视图均可使用，不改写网页文字' }));
   display.appendChild(checkRow({ key: 'rememberPerSite', label: '按网站记住显示设置', description: '配色和排版按网站保存；翻译设置在各网站共用' }));
 
-  const translation = section('04', '翻译与划词');
+  const translation = section('翻译与词语学习');
   const translationSettings = createTranslationSettings(translation, { doc });
   const readerHint = make('p', 'ezr-field-description', '进入简洁阅读后，可调整字体、段落与词语学习设置。');
   scroll.appendChild(readerHint);
@@ -415,8 +413,8 @@ export function createSettingsPanel(container, opts = {}) {
     }
     translationSettings.setPreviewing(previewing);
     readerHint.hidden = !previewing;
-    const sections = previewing ? [translation, display, typography, content] : [typography, content, display, translation];
-    sections.forEach((group, index) => { scroll.appendChild(group); group.querySelector('.ezr-section-number').textContent = String(index + 1).padStart(2, '0'); });
+    const sections = previewing ? [translation, display, typography, content] : [typography, display, translation, content];
+    sections.forEach(group => scroll.appendChild(group));
     scroll.appendChild(readerHint);
     resetBtn.textContent = previewing ? '恢复界面默认' : '恢复阅读默认';
     resetBtn.title = previewing ? '恢复配色、大写和站点显示偏好，不更改翻译设置' : '恢复阅读设置，不更改翻译设置';

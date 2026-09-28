@@ -416,3 +416,39 @@ body {
 @media (max-width: 520px) { .translation-grid { grid-template-columns: 1fr; } }
 #tool-font-preview { display:flex; align-items:center; flex-wrap:wrap; gap:.615em; padding:.769em 1.231em; font:13px/1.4 'Segoe UI','Microsoft YaHei',sans-serif; }
 #tool-font-preview button { min-height:2.308em; padding:.308em .692em; font:inherit; color:inherit; background:transparent; border:1px solid currentColor; border-radius:7px; opacity:1; }
+
+.page { padding-bottom: 112px; }
+.page__sticky-actions {
+  position: fixed;
+  z-index: 20;
+  inset: auto 0 0;
+  padding: 12px 24px;
+  border-top: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-bg) 94%, transparent);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, .08);
+}
+.page__sticky-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: var(--ui-max);
+  margin: 0 auto;
+}
+.page__sticky-status { min-width: 0; }
+.page__sticky-status .note { max-width: 68ch; }
+.page__sticky-buttons { display: flex; flex: none; align-items: center; gap: 8px; }
+.button--primary { border-color: var(--ui-accent); background: var(--ui-accent); color: var(--ui-accent-fg); }
+.button--primary:hover { filter: brightness(1.08); }
+.git-update-help { margin-top: 14px; }
+.git-update-help summary { width: fit-content; color: var(--ui-accent); cursor: pointer; }
+.git-update-help p { margin: 10px 0; }
+.git-update-help pre { overflow-x: auto; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-bg); color: var(--ui-fg); }
+.git-update-help code { font: 12px/1.7 Consolas, 'Cascadia Mono', 'Courier New', monospace; }
+@media (max-width: 720px) {
+  .page__sticky-actions { padding: 10px 16px; }
+  .page__sticky-inner { align-items: stretch; flex-direction: column; gap: 8px; }
+  .page__sticky-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+  .page__sticky-buttons .button { width: 100%; }
+  .page { padding-bottom: 148px; }
+}

@@ -785,14 +785,18 @@ function bootstrap() {
     windowRevision = state.revision; windowClosing = false;
     if (state.enabled) { windowManaged = true; return showToolbar(revealMain, state); }
     // Window synchronization owns only sessions it opened, not local automation/debug sessions.
-    if (windowManaged) close();
+    if (windowManaged) session?.hideMainToolbar();
     windowManaged = false; return { ok: true };
   }
 
   function closeWindowTools() {
-    // This closes the main toolbar only. The reader and translation tools keep
-    // their sessions; window synchronization must also keep frame selection alive.
+    // Hide immediately, then persist the choice for every page in this window.
     session?.hideMainToolbar();
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      void chrome.runtime.sendMessage({ type:'ezr:window-toolbar:set', enabled:false }).then(reply => {
+        if (!reply?.ok) transientToast(reply?.message || '工具栏关闭状态未同步到其他页面。', 'warn');
+      }).catch(() => transientToast('工具栏关闭状态未同步到其他页面。', 'warn'));
+    }
   }
 
   function cjkDominant(irDoc) {

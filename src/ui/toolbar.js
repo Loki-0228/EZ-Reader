@@ -6,6 +6,7 @@
 import { FONT_FAMILIES } from '../core/constants.js';
 import { getDoc } from '../dom/env.js';
 import { closeIcon } from './close-icon.js';
+import { setSettingsIcon } from './settings-icon.js';
 import { dockIcon } from './dock-icon.js';
 
 /**
@@ -129,7 +130,9 @@ export function createToolbar(container, opts = {}) {
   // 5) 功能按钮
   bar.appendChild(makeButton('大纲', '显示或隐藏文章大纲', () => fire(opts.onToggleOutline), 'ezr-btn-outline'));
   const pickBtn = makeButton('选择区域', '在原网页选择要阅读的区域', () => fire(opts.onPickRegion), 'ezr-btn-pick');
-  bar.appendChild(makeButton('设置', '打开设置', () => fire(opts.onOpenSettings), 'ezr-btn-settings'));
+  const settingsButton = makeButton('', '打开设置', () => fire(opts.onOpenSettings), 'ezr-btn-settings ezr-icon-button');
+  setSettingsIcon(settingsButton, '打开阅读与翻译设置', doc);
+  bar.appendChild(settingsButton);
   const translationBtn = makeButton('翻译工具', '显示翻译工具栏', () => fire(opts.onFullTranslation), 'ezr-btn-translation');
   translationBtn.setAttribute('aria-expanded', 'false');
   translationBtn.setAttribute('aria-controls', 'ezr-translation-bar');

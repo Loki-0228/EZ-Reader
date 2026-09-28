@@ -2,6 +2,7 @@ import { MAX_SELECTION, TRANSLATION_KEY, ENGLISH_LEVELS, normalizeTranslation, t
 import { isWordSelection, normalizeWordCard } from '../translation/word-card.js';
 import { downloadWordCards } from '../translation/card-download.js';
 import { readUserSelection } from '../dom/user-selection.js';
+import { setSettingsIcon } from './settings-icon.js';
 
 /** Selection UI belongs only to the reader's shadow tree. No remote text is parsed as HTML. */
 export function createTranslation({ root, article, getDocument, doc = document, request = message => chrome.runtime.sendMessage(message),
@@ -34,7 +35,8 @@ export function createTranslation({ root, article, getDocument, doc = document, 
   const deepseek = make('button', 'ezr-translate-deepseek', 'DeepSeek');
   free.setAttribute('aria-pressed', 'true');
   deepseek.setAttribute('aria-pressed', 'false');
-  const options = make('button', 'ezr-translation-options', '设置');
+  const options = make('button', 'ezr-translation-options ezr-icon-button');
+  setSettingsIcon(options, '打开翻译设置', doc);
   actions.append(free, deepseek, options);
   const quick = make('div', 'ezr-translation-quick');
   const toggles = {};

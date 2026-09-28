@@ -6,6 +6,7 @@ import { createTranslationNotes } from './translation-notes.js';
 import { createBubbleCards, bubbleKey } from './bubble-cards.js';
 import { createTranslationMode } from '../translation/mode-control.js';
 import { closeIcon } from './close-icon.js';
+import { setSettingsIcon } from './settings-icon.js';
 import { dockIcon } from './dock-icon.js';
 
 const CSS = `
@@ -27,7 +28,6 @@ const CSS = `
 .ezr-full-target-language {min-width:0;}
 .ezr-full-target-select {min-width:0;max-width:100%;}
 .ezr-full-preferences{display:flex;align-items:center;gap:.615em;margin-inline-start:auto;flex-wrap:wrap;justify-content:flex-end}
-.ezr-full-bar .ezr-full-settings{min-width:5.6em;white-space:nowrap}
 @media(max-width:760px) { .ezr-full-bar {grid-template-columns:minmax(0,1fr) auto;} .ezr-full-caption{display:none;} .ezr-full-end{grid-column:2;} .ezr-full-status{grid-column:1;} }
 @media(max-width:520px) { .ezr-full-bar{grid-template-columns:minmax(0,1fr);gap:8px;} .ezr-full-end{grid-column:1;grid-row:1;} .ezr-full-controls{grid-column:1;grid-row:2;} .ezr-full-status{grid-column:1;grid-row:3;} }
 @media(max-width:520px) { .ezr-full-page-status{grid-row:4;} }
@@ -125,7 +125,8 @@ export function createFullTranslation({ doc = document, request = message => chr
     levelInput = make('select', 'ezr-full-level'); levelInput.setAttribute('aria-label', '生词卡英语水平');
     for (const [value, label] of ENGLISH_LEVELS) { const option = make('option', '', label); option.value = value; levelInput.appendChild(option); }
     levelInput.value = selectionPrefs.level;
-    const settings = make('button', 'ezr-full-settings', '翻译设置'), close = make('button', 'ezr-full-close ezr-toolbar-close', ''); close.setAttribute('aria-label', '关闭翻译工具栏'); close.title = '关闭翻译工具栏'; close.appendChild(closeIcon(doc));
+    const settings = make('button', 'ezr-full-settings ezr-icon-button'); setSettingsIcon(settings, '打开翻译设置', doc);
+    const close = make('button', 'ezr-full-close ezr-toolbar-close', ''); close.setAttribute('aria-label', '关闭翻译工具栏'); close.title = '关闭翻译工具栏'; close.appendChild(closeIcon(doc));
     modeControl = createTranslationMode({ doc, className:'ezr-full-mode', onChange:patch => { void preferences(patch); } });
     const preferencesGroup = make('div', 'ezr-full-preferences'); preferencesGroup.append(modeControl.element, settings);
     status = make('span', 'ezr-full-status', ''); status.setAttribute('aria-live', 'polite');

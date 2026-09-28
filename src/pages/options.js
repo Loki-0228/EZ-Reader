@@ -777,11 +777,11 @@ function bindUpdateCheck() {
     } catch (error) {
       const message = String(error?.message || error);
       status.textContent = message.includes('native') || message.toLowerCase().includes('host')
-        ? '本地更新辅助程序未安装或未授权。请先运行 tools/native-update/install.ps1。'
+        ? '本地更新程序未安装或未授权。可展开「直接使用 Git 安装或更新」查看手动步骤。'
         : '无法读取本地构建信息，请确认 Git 源码仓库和 dist/extension 已完成构建。';
     } finally {
       button.disabled = false;
-      if (!pendingFingerprint) button.textContent = '检测本地更新';
+      if (!pendingFingerprint) button.textContent = '检测更新';
     }
   });
 }
