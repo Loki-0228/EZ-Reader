@@ -31,7 +31,7 @@ EZ-Reader 是一个面向 Edge / Chrome 的 Manifest V3 浏览器扩展。它将
 
 ## 快速安装
 
-### 下载发布包（推荐）
+### 下载发布包（无需构建）
 
 1. 打开 [Releases 下载页](https://github.com/Loki-0228/EZ-Reader/releases/latest)，在 Assets 中下载对应版本的 **EZ-Reader-v版本号.zip**。
 2. 解压到固定文件夹，确认里面直接包含 `manifest.json`。已构建的发布包无需安装 Node.js。
@@ -41,7 +41,7 @@ EZ-Reader 是一个面向 Edge / Chrome 的 Manifest V3 浏览器扩展。它将
 
 发布页同时提供 `SHA256SUMS.txt`，可用于校验 ZIP 下载是否完整。更新时将新版本解压到原安装目录，在扩展管理页重新加载扩展，并刷新网页。
 
-### 从源码构建
+### Git 安装（持续更新推荐）
 
 准备 **Node.js 24** 和 Chromium 119 或更新版本的 Edge / Chrome。项目无需安装 npm 依赖。
 
@@ -51,7 +51,7 @@ cd EZ-Reader
 node tools/build.js
 ```
 
-构建完成后，按上面的加载步骤选择项目中的 **`dist/extension`** 文件夹。
+构建完成后，按上面的加载步骤选择项目中的 **`dist/extension`** 文件夹。该构建目录随 Git 仓库提交，后续 `git pull` 会同时获取源码和可直接加载的扩展。
 
 这套 Git 安装方式不需要注册本地更新辅助程序，也不需要给浏览器配置 Git 访问权限。以后在项目目录更新并重新构建：
 
@@ -62,7 +62,7 @@ node tools/build.js
 
 然后在 Edge 或 Chrome 的扩展管理页点击「重新加载」，并刷新已打开的网页。
 
-也可以下载仓库 ZIP，解压后在项目目录执行构建命令。`dist/` 由构建生成，不随源码提交。
+也可以下载仓库 ZIP，解压后在项目目录执行构建命令。Git 仓库只跟踪 `dist/extension`；`dist/` 中的本地发布压缩包和临时文件不会提交。
 
 安装本地更新程序后，可在设置页底部点击「检测更新」。辅助程序会在源码仓库执行 fast-forward Git 更新并构建；构建只把变化文件同步到 `dist/extension`。发现文件差异后，再次点击即可重载扩展并刷新已打开的网页。
 

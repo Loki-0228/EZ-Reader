@@ -1,5 +1,10 @@
-# Generated extension bundle and browser test profiles / screenshots
-/dist/
+# Keep the loadable extension bundle in Git so `git pull` updates also provide a ready-to-load build.
+/dist/*
+!/dist/extension/
+/dist/extension/*
+!/dist/extension/**
+
+# Browser test profiles / screenshots
 /test-artifacts/
 
 # Dependencies and local configuration
