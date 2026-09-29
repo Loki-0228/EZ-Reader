@@ -5559,7 +5559,10 @@ function createTranslation({ root, article, getDocument, doc = document, request
     if (destroyed || !prefs.enabled || selecting || !isActive() || !root.isConnected || shadow.querySelector('.ezr-settings.is-open')
       || (mode !== 'original' && shadow.host?.hasAttribute('data-ezr-original'))) return;
     if (doc.location.href !== lastUrl) { reset(); lastUrl = doc.location.href; }
-    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel, domText: mode === 'original' });
+    // The reader capitalizes word initials with ::first-letter. Selection.toString()
+    // can omit that generated glyph in Chromium (for example, "impulse" becomes
+    // "mpulse"), so read the selected DOM range in both reader and source modes.
+    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel, domText: true });
     if (!snapshot) {
       const active = shadow.activeElement || doc.activeElement;
       const anchor = shadow.getSelection?.()?.anchorNode || doc.getSelection()?.anchorNode;
