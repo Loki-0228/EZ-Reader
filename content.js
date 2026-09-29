@@ -5378,9 +5378,22 @@ function setSettingsIcon(button, label = '设置', doc = button.ownerDocument) {
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   const gear = doc.createElementNS(svg.namespaceURI, 'path');
-  gear.setAttribute('d', 'M9.8 2.8h4.4l.52 2.18c.58.18 1.1.48 1.57.86l2.16-.62 2.2 3.82-1.62 1.56c.08.64.08 1.28 0 1.92l1.62 1.56-2.2 3.82-2.16-.62c-.47.38-.99.68-1.57.86l-.52 2.18H9.8l-.52-2.18a6.6 6.6 0 0 1-1.57-.86l-2.16.62-2.2-3.82 1.62-1.56a7.7 7.7 0 0 1 0-1.92L3.35 9.04l2.2-3.82 2.16.62c.47-.38.99-.68 1.57-.86L9.8 2.8z');
+  const toothProfile = [
+    [-13, 7.15], [-9, 7.15], [-7.5, 8.1], [7.5, 8.1],
+    [9, 7.15], [13, 7.15], [22.5, 6.9],
+  ];
+  const outline = [];
+  for (let tooth = 0; tooth < 8; tooth += 1) {
+    for (const [offset, radius] of toothProfile) {
+      const angle = ((tooth * 45 + offset - 90) * Math.PI) / 180;
+      const x = (12 + Math.cos(angle) * radius).toFixed(2);
+      const y = (12 + Math.sin(angle) * radius).toFixed(2);
+      outline.push(`${outline.length ? 'L' : 'M'}${x} ${y}`);
+    }
+  }
+  gear.setAttribute('d', `${outline.join(' ')} Z`);
   const hub = doc.createElementNS(svg.namespaceURI, 'circle');
-  hub.setAttribute('cx', '12'); hub.setAttribute('cy', '12'); hub.setAttribute('r', '6.25');
+  hub.setAttribute('cx', '12'); hub.setAttribute('cy', '12'); hub.setAttribute('r', '5');
   const center = doc.createElementNS(svg.namespaceURI, 'circle');
   center.setAttribute('cx', '12'); center.setAttribute('cy', '12'); center.setAttribute('r', '2.1');
   svg.append(gear, hub, center);
@@ -5546,7 +5559,10 @@ function createTranslation({ root, article, getDocument, doc = document, request
     if (destroyed || !prefs.enabled || selecting || !isActive() || !root.isConnected || shadow.querySelector('.ezr-settings.is-open')
       || (mode !== 'original' && shadow.host?.hasAttribute('data-ezr-original'))) return;
     if (doc.location.href !== lastUrl) { reset(); lastUrl = doc.location.href; }
-    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel, domText: mode === 'original' });
+    // The reader capitalizes word initials with ::first-letter. Selection.toString()
+    // can omit that generated glyph in Chromium (for example, "impulse" becomes
+    // "mpulse"), so read the selected DOM range in both reader and source modes.
+    const snapshot = readUserSelection({ doc, root: mode === 'original' ? doc.documentElement : article, exclude: mode === 'original' ? shadow.host || root : panel, domText: true });
     if (!snapshot) {
       const active = shadow.activeElement || doc.activeElement;
       const anchor = shadow.getSelection?.()?.anchorNode || doc.getSelection()?.anchorNode;
