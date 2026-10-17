@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { CdpPage } from './cdp.js';
+import { fulfillModelList } from './model-fixture.js';
 
 /** Original PDF text layers and translated overlays must anchor the same cached words. */
 export async function pdfBubbleChecks({ page, session, workerSession, extensionOrigin, control, check, loadFile, artifacts }) {
@@ -8,6 +9,7 @@ export async function pdfBubbleChecks({ page, session, workerSession, extensionO
   const calls = [], meanings = { First:'首个', Second:'第二', Third:'第三', Another:'另一' };
   let fail = true, options;
   const off = session.on('Fetch.requestPaused', async event => {
+    if (await fulfillModelList(session,event,workerSession)) return;
     if (!event.request.url.startsWith('https://api.deepseek.com/')) return;
     const body = JSON.parse(event.request.postData), payload = JSON.parse(body.messages.at(-1).content); calls.push({body,payload});
     const segments = payload.segments.map(segment => {

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { CdpPage } from './cdp.js';
+import { fulfillModelList } from './model-fixture.js';
 
 export async function fullTranslationChecks(page, iso, check, artifacts) {
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -15,6 +16,7 @@ export async function fullTranslationChecks(page, iso, check, artifacts) {
   const calls = []; let delay = 0, failNextFree = false;
   const plain = text => text.replace(/\bbank\b/g, '银行').replace(/\bfinancial\b/g, '金融').replace(/\bdeposits\b/g, '存款');
   const off = session.on('Fetch.requestPaused', async event => {
+    if (await fulfillModelList(session,event,sessionId)) return;
     const body = event.request.postData ? JSON.parse(event.request.postData) : null;
     const q = body ? null : new URL(event.request.url).searchParams.get('q');
     calls.push(body || { messages: [], free: true, q, url: event.request.url });

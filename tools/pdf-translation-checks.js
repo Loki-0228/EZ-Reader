@@ -8,6 +8,7 @@ import { CdpPage, CdpSession, waitForEndpoint } from './cdp.js';
 import { pdfOriginalChecks } from './pdf-original-checks.js';
 import { pdfReaderChecks } from './pdf-reader-checks.js';
 import { pdfBubbleChecks } from './pdf-bubble-checks.js';
+import { pdfContextChecks } from './pdf-context-checks.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifacts = path.join(root, 'test-artifacts', 'pdf-translation');
@@ -86,6 +87,7 @@ try {
   const mixedPath=path.join(artifacts,'mixed-size.pdf');
   await writeFile(mixedPath,fixturePdf(false,800,900),'ascii');
   await pdfReaderChecks({page,session,check,loadFile,mixedPath,pdfPath,artifacts});
+  await pdfContextChecks({page,session,workerSession,extensionOrigin,check,loadFile});
   const control = code => page.evaluate(`(()=>{const sh=document.getElementById('ezr-root').shadowRoot;${code}})()`);
   await control("sh.querySelector('.ezr-btn-translation').click()").catch(async () => page.evaluate("globalThis.__ezr.send({type:'ezr:full-translation'})"));
   const toolMetrics = () => page.evaluate(`(()=>{const sh=document.getElementById('ezr-root').shadowRoot;return [sh.querySelector('.ezr-toolbar'),sh.querySelector('.ezr-full-bar'),document.getElementById('pdf-navigation')].map(e=>({font:parseFloat(getComputedStyle(e).fontSize),height:e.getBoundingClientRect().height}))})()`);

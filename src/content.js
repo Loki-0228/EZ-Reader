@@ -788,7 +788,10 @@ function bootstrap() {
     windowRevision = state.revision; windowClosing = false;
     if (state.enabled) { windowManaged = true; return showToolbar(revealMain, state); }
     // Window synchronization owns only sessions it opened, not local automation/debug sessions.
-    if (windowManaged) session?.hideMainToolbar();
+    if (windowManaged || (isDocumentReader && revealMain)) {
+      session?.hideMainToolbar();
+      fullTranslation.setToolbarVisible(false);
+    }
     windowManaged = false; return { ok: true };
   }
 

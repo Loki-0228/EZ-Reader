@@ -197,15 +197,17 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     vocabulary = []; learningBusy = false; retry.hidden = true;
     cardActions.hidden = true;
     meta.textContent = knowledge.textContent = credit.textContent = '';
-    output.textContent = provider === 'deepseek' ? '正在翻译，首次使用会先分析阅读语境…' : '正在翻译…';
+    output.textContent = '正在翻译…';
     detail.textContent = provider === 'deepseek' ? 'DeepSeek' : 'MyMemory · 免费翻译';
     position(chosen.rect);
     try {
       const ir = mode === 'original' ? { title:doc.title, blocks:[] } : getDocument() || { blocks:[] };
       if (mode === 'original') context = chosen.nearby || chosen.text;
       else if (!context) context = sampleContext((ir.blocks || []).map(block => block.text || '').join('\n\n')) || chosen.nearby || chosen.text;
+      const sharedView = await getView();
+      if (!alive(chosen, token)) return;
       const payload = { provider, text: chosen.text, nearby: chosen.nearby,
-        view: getView() || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
+        view: sharedView || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } };
       const reply = await request({ type: 'ezr:translation:run', ...payload });
       if (!alive(chosen, token)) return;
       if (!reply?.ok) throw new Error(reply?.message || '翻译服务暂时无响应，请重试。');
@@ -305,8 +307,10 @@ export function createTranslation({ root, article, getDocument, doc = document, 
     knowledge.textContent = `正在按 ${prefs.level} 水平挑选${wholeArticle ? '本篇' : '本段'}生词…`;
     position(chosen.rect);
     try {
-      const reply = await request({ type: 'ezr:translation:vocabulary', provider: 'deepseek', text: wholeArticle ? context : chosen.text,
-        view: getView() || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } });
+      const sharedView = await getView();
+      if (!alive(chosen, token)) return;
+      const reply = await request({ type: 'ezr:translation:vocabulary', provider: 'deepseek', text: wholeArticle ? sharedView?.context || context : chosen.text,
+        view: sharedView || { id: viewId, context, title: ir.title || doc.title, language: doc.documentElement.lang } });
       if (!alive(chosen, token)) return;
       if (!reply?.ok) throw new Error(reply?.message || '生词挑选暂不可用。');
       vocabulary = (reply.words || []).map(word => normalizeWordCard({ ...word, pageUrl: chosen.url, pageTitle: ir.title || doc.title }));

@@ -112,7 +112,7 @@ export function createTranslationService({ fetchFn = fetch, detectLanguage, save
     if (!entry.analysis) {
       entry.analysis = (async () => {
         let previous;
-        try { previous = await saved.get?.(entry.slot); } catch { /* Continue with in-memory context. */ }
+        try { previous = await saved.get?.(entry.slot, entry.key); } catch { /* Continue with in-memory context. */ }
         ensure(entry);
         if (previous?.key === entry.key && now() - previous.ts < TTL) {
           entry.summary = normalizeSummary(JSON.stringify(previous.summary));

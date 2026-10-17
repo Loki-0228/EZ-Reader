@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { splitTranslationText, joinTranslations } from '../src/dom/translation-text.js';
 import { createTranslationService, splitUtf8 } from '../src/translation/service.js';
+import { readSavedContext } from '../src/translation/background.js';
 
 const input = texts => ({ slot: '1:0', documentId: 'doc', url: 'https://example.com/article',
   view: { id: 'page', title: 'Bank', context: 'The bank manages deposits.', language: 'en', fullDocument: true }, texts, provider: 'deepseek' });
@@ -114,6 +115,24 @@ test('full text and level-specific learning share context and survive selection 
   assert.equal(JSON.parse(calls.at(-1).body.messages[1].content).learnerLevel, 'C1');
   await service.full({ ...page, url: 'https://other.example/' }, config, key);
   assert.equal(calls.length, 6);
+});
+
+test('PDF full translation restores selection context after the worker restarts, scoped by document and frame', async () => {
+  const bag={},calls=[];
+  const saved={get:(slot,key)=>readSavedContext({get:async()=>bag},slot,key),set:async(slot,value)=>{bag['ezr:translation:context:'+slot]=value;}};
+  const options={saved,fetchFn:async(_url,init)=>{
+    const body=JSON.parse(init.body);calls.push(body);
+    return {ok:true,json:async()=>({choices:[{message:{content:body.messages[0].content.includes('语境分析器')?JSON.stringify({topic:'PDF',tone:'clear',terms:[]}):'译文'}}]})};
+  }};
+  const page=input(['bank']);
+  await createTranslationService(options).translate({...page,text:'bank'},config,key);
+  await createTranslationService(options).full(page,config,key);
+  const analyses=()=>calls.filter(body=>body.messages[0].content.includes('语境分析器')).length;
+  assert.equal(analyses(),1);
+  await createTranslationService(options).full({...page,slot:'1:1'},config,key);
+  assert.equal(analyses(),2);
+  await createTranslationService(options).full({...page,documentId:'another-pdf'},config,key);
+  assert.equal(analyses(),3);
 });
 
 test('only DeepSeek needs credentials, malformed batches still fail and language changes invalidate results', async () => {

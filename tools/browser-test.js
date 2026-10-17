@@ -33,6 +33,7 @@ import { translationChecks } from './translation-checks.js';
 import { fullTranslationChecks } from './full-translation-checks.js';
 import { bubbleCardChecks } from './bubble-card-checks.js';
 import { toolbarChecks } from './toolbar-checks.js';
+import { toolbarRecoveryChecks } from './toolbar-recovery-checks.js';
 import { textTranslationChecks } from './text-translation-checks.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -168,6 +169,7 @@ const LOAD_CONSTANTS = `
 /* --------------------------------------------------------------- the fixtures */
 
 const SUITES = {
+  'toolbar-recovery': { fixture: 'paper.html' },
   toolbar: { fixture: 'paper.html' },
   // `full-translation` asserts what happens when NO DeepSeek key is configured, so it
   // must run before any suite that stores one (`translation`, then `text-translation`).
@@ -990,6 +992,10 @@ async function main() {
 
       await resetSettings(page, iso);
 
+      if (name === 'toolbar-recovery') {
+        await toolbarRecoveryChecks(page, iso, check);
+        continue;
+      }
       if (name === 'toolbar') {
         await toolbarChecks(page, iso, check, ARTIFACTS);
         continue;

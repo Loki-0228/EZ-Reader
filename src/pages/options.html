@@ -40,6 +40,8 @@
         </div>
         <p class="note">免费翻译使用 MyMemory，无需密钥，有服务额度限制。英文词语会附上词典释义和例句；其他语言可使用 AI 卡片。</p>
         <label class="translation-field">DeepSeek 模型<select class="control" id="translation-model"></select></label>
+        <button id="translation-model-refresh" class="button" type="button">刷新模型列表</button>
+        <p id="translation-model-state" class="note" role="status" aria-live="polite"></p>
         <label class="translation-field">DeepSeek API Key<input class="control" id="translation-key" type="password" autocomplete="off" spellcheck="false" maxlength="256" /></label>
         <p id="translation-key-state" class="note"></p>
         <p class="note">密钥保存在本机，由后台调用官方 API；DeepSeek 按你的账户额度计费。免费模式发送选文到翻译和词典服务，并转译词典释义。首次 AI 翻译还会用当前阅读节选分析语境，后续只使用摘要、相邻段落和选文；词语讲解单独生成。切换页面或阅读区域时重建语境。</p>

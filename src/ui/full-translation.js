@@ -46,7 +46,7 @@ const CSS = `
 /** A document owns the translation cache, shared by website and all reader re-renders. */
 export function createFullTranslation({ doc = document, request = message => chrome.runtime.sendMessage(message), isReaderActive = () => false, onVisibilityChange = () => {} }) {
   let bar, status, start, stop, retry, bilingualInput, originalSelection, originalRoot, levelInput, cardsInput, providerInput, modeControl, targetInput, readerTools, dockButton;
-  let reader = null, website = [], readerGroups = [], pdfGroups = [], notes = null, view = null;
+  let reader = null, website = [], readerGroups = [], pdfGroups = [], notes = null, view = null, preparingView = null;
   let enabled = false, bilingual = true, running = false, epoch = 0, revision = 0, url = doc.location.href, signature = '';
   let visible = false, originalSuspended = false, selectionPrefs = normalizeTranslation();
   let navigationTimer = 0, savingPreferences = false, unsubscribePdf, pageStatus, bubbles;
@@ -75,6 +75,27 @@ export function createFullTranslation({ doc = document, request = message => chr
       ...(reader.pdfTranslation?.state.failedPages || [])])].sort((a,b) => a - b);
   };
   const message = text => { if (status) status.textContent = text; };
+  const makeView = context => ({ id:crypto.randomUUID(), title:doc.title, language:doc.documentElement.lang,
+    fullDocument:true, context:sampleContext(context) });
+  function selectionView() {
+    checkUrl();
+    if (!reader?.isPdf || view) return view;
+    if (preparingView) return preparingView;
+    const owner = reader, version = revision, requestUrl = url;
+    const job = (async () => {
+      await owner.prepareTranslation?.();
+      const groups = await owner.pdfTranslation?.prepare();
+      if (reader !== owner || revision !== version || doc.location.href !== requestUrl) throw new Error('PDF 已切换，请重新划词。');
+      if (!groups?.length) throw new Error('PDF 没有可提取的文字。');
+      // A PDF text layer has no paragraph context. Use the same document sample
+      // for every selection and full translation, including selections on other pages.
+      view ||= makeView(groups.map(group => group.source).join('\n\n'));
+      return view;
+    })();
+    preparingView = job;
+    void job.finally(() => { if (preparingView === job) preparingView = null; }).catch(() => {});
+    return job;
+  }
   const closeSelections = () => { originalSelection?.close(); reader?.closeSelection(); bubbles?.minimize(); };
   const cardsChanged = (before, next) => next.bubbleCards !== before.bubbleCards || next.level !== before.level || next.explanations !== before.explanations;
   function refreshCards(continueTranslation = false) {
@@ -178,7 +199,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     close.addEventListener('click', () => setToolbarVisible(false, true));
     originalRoot = make('div', 'ezr-original-selection'); reader.root.appendChild(originalRoot);
     originalSelection = createTranslation({ root: originalRoot, article: doc.body, doc, request, mode: 'original', onOpenSettings:() => reader?.openSettings?.(),
-      isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: () => view,
+      isActive: () => !!reader && !isReaderActive() && !originalSuspended, canSelect: range => !isTranslatedSelection(range, website), getView: selectionView,
       getDocument: () => ({ title: doc.title, blocks: [] }) });
     void request({ type: 'ezr:translation:config' }).then(result => { if (result?.ok) { selectionPrefs = normalizeTranslation(result.config); sync(); refreshCards(); } }).catch(() => {});
     place();
@@ -263,7 +284,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     epoch++; revision++; running = false; enabled = false;
     restoreTranslationGroups(website); restoreTranslationGroups(readerGroups); website = []; readerGroups = [];
     pdfGroups = []; reader?.pdfTranslation?.restore();
-    cache.clear(); failures.clear(); cardCache.clear(); cardFailures.clear(); bubbleState.cards.clear(); bubbleState.closed.clear(); view = null; notes?.clear(); closeSelections();
+    cache.clear(); failures.clear(); cardCache.clear(); cardFailures.clear(); bubbleState.cards.clear(); bubbleState.closed.clear(); view = null; preparingView = null; notes?.clear(); closeSelections();
     sync(); if (status) status.textContent = '页面或翻译设置已改变，请重新开始。';
   }
   function checkUrl() { if (url !== doc.location.href) { invalidate(); url = doc.location.href; } }
@@ -312,8 +333,9 @@ export function createFullTranslation({ doc = document, request = message => chr
       signature = nextSignature; selectionPrefs = normalizeTranslation(reply.config);
       restoreTranslationGroups(website); website = reader.isPdf ? [] : collectTranslationGroups(doc.body, doc);
       if (!isReaderActive()) website = prioritizeWebsiteGroups(website, doc);
-      if (!view) view = { id: crypto.randomUUID(), title: doc.title, language: doc.documentElement.lang, fullDocument: true,
-        context: sampleContext(reader.isPdf ? pdfGroups.filter(pdfAllowed).map(group => group.source).join('\n\n') : isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n')) };
+      if (reader.isPdf) await selectionView();
+      else if (!view) view = makeView(isReaderActive() ? reader.getDocument().blocks.map(block => block.text || '').join('\n\n') : website.map(group => group.source).join('\n\n'));
+      if (token !== epoch) return;
       if (reader) { restoreTranslationGroups(readerGroups); readerGroups = collectReader(); }
       const groups = reader.isPdf ? pdfGroups.filter(pdfAllowed) : isReaderActive() ? readerGroups : website;
       syncBubbles();
@@ -409,7 +431,7 @@ export function createFullTranslation({ doc = document, request = message => chr
     toggle() { if (reader) setToolbarVisible(!visible, true); }, translate, setToolbarVisible,
     mainToolbarChanged() { sync(); },
     resetDocument() { invalidate(); signature = ''; },
-    getView() { checkUrl(); return view; },
+    getView: selectionView,
     isTranslatedSelection(range) { checkUrl(); return isTranslatedSelection(range, website) || isTranslatedSelection(range, readerGroups); },
     addCards(cards, range) {
       for (const card of cards) if (!bubbleState.closed.has(bubbleKey(card))) bubbleState.cards.set(bubbleKey(card), card);

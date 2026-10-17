@@ -108,6 +108,7 @@ const ENTRY = 'src/content.js';
  * makes Chromium refuse the extension with "无法加载选项页".
  */
 const STATIC_GLUE = [
+  { from: 'src/ui/model-picker.js', to: 'ui/model-picker.js' },
   { from: 'src/background/window-toolbar.js', to: 'background/window-toolbar.js' },
   { from: 'manifest.json', to: 'manifest.json' },
   { from: 'src/background/documents.js', to: 'background/documents.js' },
@@ -144,6 +145,8 @@ const REQUIRED_OUTPUT = [
   'translation/background.js',
   'translation/service.js',
   'translation/config.js',
+  'translation/models.js',
+  'ui/model-picker.js',
   'translation/prompts.js',
   'translation/credentials.js',
   'translation/word-card.js',

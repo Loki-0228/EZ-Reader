@@ -18,6 +18,16 @@ const viewer = new PDFViewer({ container, viewer:document.getElementById('pdf-pa
 let documentJob = null, loadController = null, generation = 0, extraction = null, sources = [];
 const message = text => { status.textContent = text; status.hidden = !text; };
 const toolbar = () => globalThis.__ezr.send({ type:'ezr:toolbar-open' });
+// Extension documents do not receive tabs.sendMessage, which targets content scripts.
+const readerTab = await chrome.tabs.getCurrent();
+const toolbarMessage = (message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || message?.type !== 'ezr:document-toolbar' || message.targetTabId !== readerTab?.id
+    || !['ezr:status','ezr:toolbar-state'].includes(message.command?.type)) return;
+  globalThis.__ezr.send(message.command).then(respond).catch(error => respond({ok:false,message:error.message}));
+  return true;
+};
+chrome.runtime.onMessage.addListener(toolbarMessage);
+window.addEventListener('pagehide', () => chrome.runtime.onMessage.removeListener(toolbarMessage), {once:true});
 const exportButton = document.getElementById('pdf-export');
 const editButton = document.getElementById('pdf-batch-edit'), editControls = document.getElementById('pdf-edit-controls');
 const sizeInput = document.getElementById('pdf-edit-font-size');

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { CdpPage } from './cdp.js';
+import { fulfillModelList } from './model-fixture.js';
 
 /** Exercises the real extension with deterministic intercepted provider responses. */
 export async function bubbleCardChecks(page, iso, check, artifacts) {
@@ -13,6 +14,7 @@ export async function bubbleCardChecks(page, iso, check, artifacts) {
   const calls = []; let options, fail = false, delay = 0;
   const plain = text => text.replace(/\bbank\b/gi, '银行').replace(/\bfinancial\b/gi, '金融').replace(/\bdeposits\b/gi, '存款');
   const off = session.on('Fetch.requestPaused', async event => {
+    if (await fulfillModelList(session,event,sessionId)) return;
     const body = event.request.postData ? JSON.parse(event.request.postData) : null;
     const payload = body ? JSON.parse(body.messages.at(-1).content) : null;
     calls.push(body ? { body, payload } : { free:true });

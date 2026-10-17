@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { CdpPage } from './cdp.js';
+import { fulfillModelList } from './model-fixture.js';
 
 /**
  * Free-form translation panel: opening it from the toolbar, translating typed
@@ -28,6 +29,7 @@ export async function textTranslationChecks(page, iso, check, artifacts) {
 
   const calls = [];
   const off = session.on('Fetch.requestPaused', async event => {
+    if (await fulfillModelList(session,event,sessionId)) return;
     const request = event.request;
     const ds = request.url.includes('api.deepseek.com');
     const body = ds ? JSON.parse(request.postData) : null;

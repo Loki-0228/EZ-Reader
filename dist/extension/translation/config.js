@@ -5,7 +5,7 @@ export const LANGUAGES = Object.freeze([
   ['ko', '韩语'], ['fr', '法语'], ['de', '德语'], ['es', '西班牙语'],
   ['ru', '俄语'], ['pt', '葡萄牙语'], ['it', '意大利语'], ['ar', '阿拉伯语'],
 ]);
-export const MODELS = Object.freeze(['deepseek-flash', 'deepseek-v4-pro', 'deepseek-chat']);
+export const isModelId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value);
 export const ENGLISH_LEVELS = Object.freeze([
   ['A1', 'A1 · 入门'], ['A2', 'A2 · 基础'], ['B1', 'B1 · 中级'],
   ['B2', 'B2 · 中高级'], ['C1', 'C1 · 高级'], ['C2', 'C2 · 熟练'],
@@ -43,7 +43,7 @@ export function normalizeTranslation(raw = {}) {
     source: raw.source === 'auto' || valid(raw.source) ? raw.source : 'auto',
     target: valid(raw.target) ? raw.target : 'zh-CN',
     textTarget: valid(raw.textTarget) ? raw.textTarget : valid(raw.target) ? raw.target : 'zh-CN',
-    model: MODELS.includes(raw.model) ? raw.model : 'deepseek-flash',
+    model: isModelId(raw.model) ? raw.model : 'deepseek-flash',
     provider: raw.provider === 'deepseek' ? 'deepseek' : 'free',
     preload: raw.preload === true,
     explanations: typeof raw.explanations === 'boolean' ? raw.explanations : true,

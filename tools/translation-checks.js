@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { mkdtemp, readdir, readFile } from 'node:fs/promises';
 import { CdpPage } from './cdp.js';
+import { fulfillModelList } from './model-fixture.js';
 
 /** Real extension/UI pipeline with API responses intercepted in the worker, no account credits used. */
 export async function translationChecks(page, iso, check, artifacts) {
@@ -19,6 +20,7 @@ export async function translationChecks(page, iso, check, artifacts) {
   const calls = [];
   let failNext = false, delayNext = false, dictionaryDown = false, allDictionariesDown = false;
   const off = session.on('Fetch.requestPaused', async event => {
+    if (await fulfillModelList(session,event,sessionId)) return;
     const request = event.request;
     const ds = request.url.includes('api.deepseek.com');
     const dictionary = request.url.includes('dictionaryapi.dev');

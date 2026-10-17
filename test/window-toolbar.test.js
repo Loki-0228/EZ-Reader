@@ -7,7 +7,8 @@ function fixture() {
   const event = name => ({ addListener: callback => { listeners[name] = callback; } });
   const tabs = [{id:1,windowId:10,url:'https://example.com/a'},{id:2,windowId:10,url:'https://example.com/b'},
     {id:3,windowId:20,url:'https://example.com/c'},{id:4,windowId:10,url:'edge://settings'}];
-  const api = { runtime:{id:'test',getURL:path=>'chrome-extension://test/'+path,onMessage:event('message')},
+  const api = { runtime:{id:'test',getURL:path=>'chrome-extension://test/'+path,onMessage:event('message'),
+    sendMessage:async message=>{deliveries.push({id:message.targetTabId,...message.command});return {ok:true};}},
     storage:{session:{get:async key=>({[key]:bag[key]}),set:async values=>Object.assign(bag,values),remove:async key=>{delete bag[key];}}},
     tabs:{get:async id=>({...tabs.find(tab=>tab.id===id)}),query:async query=>tabs.filter(tab=>tab.windowId===query.windowId),
       sendMessage:async (id,message)=>{frames.push({id,...message});return {ok:true};},
@@ -18,6 +19,15 @@ function fixture() {
 }
 const set = (f, enabled, sender=f.sender) => f.controller.handle({type:'ezr:window-toolbar:set',enabled},sender);
 const translation = (f, visible, sender=f.sender) => f.controller.handle({type:'ezr:window-toolbar:translation',visible},sender);
+
+test('window reopen delivers directly to the extension PDF reader',async()=>{
+  const f=fixture(); f.tabs[0].url='chrome-extension://test/pages/document-reader.html#document';
+  assert.equal((await set(f,true)).available,true);
+  assert.ok(f.deliveries.some(item=>item.id===1&&item.enabled));
+  await set(f,false);
+  assert.equal(f.deliveries.filter(item=>item.id===1).at(-1).enabled,false);
+  assert.deepEqual(f.injections,[]);
+});
 
 test('translation visibility survives navigation and worker sleep without reopening locally hidden bars',async()=>{
   const f=fixture(); await set(f,true); f.deliveries.length=0;
