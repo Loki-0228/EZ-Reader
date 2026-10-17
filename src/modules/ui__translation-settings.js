@@ -1,5 +1,6 @@
-import { LANGUAGES, MODELS, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation } from '../translation/config.js';
+import { LANGUAGES, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation } from '../translation/config.js';
 import { createTranslationMode } from '../translation/mode-control.js';
+import { createModelPicker } from './model-picker.js';
 
 /** Shared translation preferences. Credentials stay on the extension's options page. */
 export function createTranslationSettings(container, { doc = container.ownerDocument,
@@ -34,7 +35,12 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
   add('provider', '翻译服务', '', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
   add('source', '原文语言', '', [['auto', '自动识别'], ...LANGUAGES]);
   add('target', '全文与划词目标语言', '也可在翻译工具栏中切换', LANGUAGES);
-  add('model', 'DeepSeek 模型', '', MODELS.map(model => [model, model]));
+  add('model', 'DeepSeek 模型', '', []);
+  const modelStatus = make('p', 'ezr-field-description'); modelStatus.setAttribute('role', 'status');
+  const modelRefresh = make('button', 'ezr-translation-config', '刷新模型列表'); modelRefresh.type = 'button';
+  container.append(modelStatus, modelRefresh);
+  const modelPicker = createModelPicker(controls.get('model'), { request, onStatus:text => { modelStatus.textContent = text; } });
+  modelRefresh.addEventListener('click', () => { void modelPicker.load(true); });
   const learning = make('div', 'ezr-settings-learning');
   learning.appendChild(make('h4', 'ezr-settings-subtitle', '自动化与词语学习'));
   add('preload', '划词后自动翻译', '选区稳定后，仅请求当前所选服务', null, learning);
@@ -60,6 +66,7 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
         || (key === 'level' && (prefs.provider !== 'deepseek' || (!prefs.wordCards && !prefs.explanations && !prefs.bubbleCards)))
         || (key === 'model' && prefs.provider !== 'deepseek');
     }
+    modelPicker.update(prefs.model, !ready || busy || prefs.provider !== 'deepseek');
     learning.hidden = original && !prefs.bubbleCards;
   }
   async function load() {
@@ -70,6 +77,8 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
       if (destroyed || token !== revision) return;
       if (!reply?.ok) throw new Error(reply?.message || '无法读取翻译设置。');
       prefs = normalizeTranslation(reply.config); ready = true; status.textContent = '';
+      modelPicker.update(prefs.model);
+      if (reply.hasKey) void modelPicker.load(); else modelPicker.reset();
     } catch (error) {
       if (destroyed || token !== revision) return;
       status.textContent = error.message; retry.hidden = false;
@@ -108,6 +117,6 @@ export function createTranslationSettings(container, { doc = container.ownerDocu
   render(); void load();
   return {
     setPreviewing(value) { original = !!value; render(); },
-    destroy() { destroyed = true; revision++; chrome.storage.onChanged.removeListener(changed); },
+    destroy() { destroyed = true; revision++; modelPicker.destroy(); chrome.storage.onChanged.removeListener(changed); },
   };
 }

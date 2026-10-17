@@ -2,12 +2,21 @@ import { createTranslationService } from './service.js';
 import { normalizeTranslation, patchTranslation, TRANSLATION_KEY, translationContextKey } from './config.js';
 import { createCredentialStore } from './credentials.js';
 import { createWordbook } from './wordbook.js';
+import { createModelStore } from './models.js';
 
 const CONTEXT_PREFIX = 'ezr:translation:context:';
+
+/** After worker sleep, selection and full-text slots can restore the same document summary. */
+export async function readSavedContext(storage, slot, key) {
+  const data = await storage.get(null), scope = CONTEXT_PREFIX + slot.split('/')[0];
+  return Object.keys(data).filter(name => (name === scope || name.startsWith(scope + '/')) && data[name]?.key === key)
+    .map(name => data[name]).sort((a,b) => b.ts - a.ts)[0];
+}
 
 /** Registered only in the MV3 worker. Credentials are never returned in reader messages. */
 export function registerTranslation(chromeApi = chrome) {
   const credentials = createCredentialStore();
+  const models = createModelStore();
   const wordbook = createWordbook(chromeApi.storage.local);
   let preferenceWrites = Promise.resolve();
   function writeConfig(work) {
@@ -19,7 +28,7 @@ export function registerTranslation(chromeApi = chrome) {
   const service = createTranslationService({
     detectLanguage: text => chromeApi.i18n.detectLanguage(text),
     saved: {
-      get: async slot => (await session.get(CONTEXT_PREFIX + slot))[CONTEXT_PREFIX + slot],
+      get: (slot, key) => readSavedContext(session, slot, key),
       set: async (slot, value) => {
         await session.set({ [CONTEXT_PREFIX + slot]: value });
         const data = await session.get(null);
@@ -86,6 +95,7 @@ export function registerTranslation(chromeApi = chrome) {
     const bag = await chromeApi.storage.local.get(TRANSLATION_KEY);
     const config = normalizeTranslation(bag[TRANSLATION_KEY]);
     if (message.type === 'ezr:translation:config') return { ok: true, config, hasKey: !!(await credentials.get()) };
+    if (message.type === 'ezr:translation:models') return { ok:true, models:await models.load(await credentials.get(), message.refresh === true) };
     if (message.type === 'ezr:translation:options') {
       await chromeApi.runtime.openOptionsPage();
       return { ok: true };
@@ -104,6 +114,7 @@ export function registerTranslation(chromeApi = chrome) {
           const apiKey = message.apiKey.trim();
           if (apiKey && !/^[\x21-\x7E]{10,256}$/.test(apiKey)) throw new Error('API Key 格式无效。');
           await credentials.set(apiKey);
+          models.clear();
         }
         await chromeApi.storage.local.set({ [TRANSLATION_KEY]: next });
         if (typeof message.apiKey === 'string') service.clear();

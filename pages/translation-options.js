@@ -1,5 +1,6 @@
-import { LANGUAGES, MODELS, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation, translationModePatch } from '../translation/config.js';
+import { LANGUAGES, ENGLISH_LEVELS, TRANSLATION_KEY, normalizeTranslation, translationModePatch } from '../translation/config.js';
 import { createTranslationMode } from '../translation/mode-control.js';
+import { createModelPicker } from '../ui/model-picker.js';
 
 const byId = id => document.getElementById(id);
 const status = byId('translation-status');
@@ -19,13 +20,17 @@ function fill(id, pairs) {
     byId(id).appendChild(option);
   }
 }
+const modelPicker = createModelPicker(byId('translation-model'), { request:call,
+  onStatus:text => { byId('translation-model-state').textContent = text; } });
+byId('translation-model-refresh').addEventListener('click', () => { void modelPicker.load(true); });
 function render(reply) {
   revision++; dirty = false;
   current = normalizeTranslation(reply.config);
   modeControl.update(current);
   byId('translation-source').value = current.source;
   byId('translation-target').value = current.target;
-  byId('translation-model').value = current.model;
+  modelPicker.update(current.model);
+  if (reply.hasKey) void modelPicker.load(); else modelPicker.reset();
   byId('translation-provider').value = current.provider;
   byId('translation-preload').checked = current.preload;
   byId('translation-explanations').checked = current.explanations;
@@ -65,7 +70,6 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 });
 fill('translation-source', [['auto', '自动识别'], ...LANGUAGES]);
 fill('translation-target', LANGUAGES);
-fill('translation-model', MODELS.map(model => [model, model === 'deepseek-flash' ? `${model}（推荐）` : model]));
 fill('translation-provider', [['free', '免费翻译'], ['deepseek', 'DeepSeek']]);
 fill('translation-level', ENGLISH_LEVELS);
 byId('translation-word-cards').addEventListener('change', dependencies);
@@ -73,7 +77,7 @@ byId('translation-explanations').addEventListener('change', dependencies);
 byId('translation-save').addEventListener('click', () => act(async () => {
   const message = { type: 'ezr:translation:save', config: {
     source: byId('translation-source').value,
-    target: byId('translation-target').value, model: byId('translation-model').value,
+    target: byId('translation-target').value, model: byId('translation-model').value || current.model,
     provider: byId('translation-provider').value, preload: byId('translation-preload').checked,
     explanations: byId('translation-explanations').checked,
     wordCards: byId('translation-word-cards').checked, autoSave: byId('translation-auto-save').checked,

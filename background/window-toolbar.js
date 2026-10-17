@@ -15,11 +15,13 @@ export function registerWindowToolbar(api = chrome, { send, inject } = {}) {
   };
   async function deliver(tab, state, allowInject = false) {
     if (!state.configured || !Number.isInteger(tab.id) || tab.windowId !== state.windowId) return null;
-    if (tab.url && !/^(https?|file):/.test(tab.url)) return null;
+    const documentReader = tab.url?.split(/[?#]/)[0] === api.runtime.getURL('pages/document-reader.html');
+    if (tab.url && !/^(https?|file):/.test(tab.url) && !documentReader) return null;
     const message = { type: 'ezr:toolbar-state', ...state };
+    if (documentReader) return api.runtime.sendMessage({type:'ezr:document-toolbar',targetTabId:tab.id,command:message}).catch(() => null);
     void api.tabs.sendMessage(tab.id, { ...state, type:'ezr:frame-toolbar-state' }).catch(() => {});
     let reply = await send(tab.id, message);
-    if (reply === null && state.enabled && allowInject) {
+    if (reply === null && state.enabled && allowInject && !documentReader) {
       const injected = await inject(tab.id);
       if (injected?.ok) reply = await send(tab.id, message);
     }
